@@ -1,0 +1,165 @@
+name: Renovate Command
+
+on:
+  workflow_call:
+    inputs:
+      runner-repository:
+        default: renovate
+        description:
+          Name of the repository in this organization holding the scheduled
+          Renovate workflow. A command dispatches that workflow so the request
+          is acted on in about a minute rather than at the next scheduled run.
+        required: false
+        type: string
+      runner-workflow:
+        default: renovate.yaml
+        description:
+          Filename of the workflow to dispatch inside runner-repository.
+        required: false
+        type: string
+    secrets:
+      app-id:
+        description:
+          Identifier of a GitHub App installed on both this repository and the
+          runner repository. Unlike _release-please.yaml there is no
+          GITHUB_TOKEN fallback and both secrets are required, because
+          GITHUB_TOKEN cannot dispatch a workflow in another repository at all.
+        required: true
+      private-key:
+        description: Private key of the GitHub App named by app-id.
+        required: true
+
+# Unlike _release-please.yaml, this one can state its permissions, and the
+# reason is worth knowing before copying either pattern. Every write here goes
+# through the application token minted below — the reaction, the pull request
+# body, the dispatch — so GITHUB_TOKEN is never used and needs nothing. A
+# called workflow may always request less than its caller granted, so an empty
+# block is safe for every caller; it is requesting *more* that fails the run.
+permissions: {}
+
+# Deliberately no concurrency block, and the caller has to carry one instead.
+# Same reasoning as _release-please.yaml: GitHub documents concurrency at the
+# caller and says nothing about a group declared in a called workflow.
+# README.md carries the block to copy.
+
+jobs:
+  command:
+    name: Run the command
+    # Only a prefilter, to keep a runner from starting for every comment in the
+    # repository. The real parse is in the step below and is stricter — this
+    # would match somebody quoting a command inside a sentence.
+    if: contains(github.event.comment.body, '@renovate')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Scoped to two repositories: this one, to read and edit the pull request
+      # and to react to the comment, and the runner, to dispatch it. When a
+      # command is used in the runner repository itself both names are the
+      # same, which GitHub accepts.
+      - name: Mint an application token
+        id: app-token
+        uses: actions/create-github-app-token@v3.2.0
+        with:
+          app-id: ${{ secrets.app-id }}
+          owner: ${{ github.repository_owner }}
+          private-key: ${{ secrets.private-key }}
+          repositories: |
+            ${{ github.event.repository.name }}
+            ${{ inputs.runner-repository }}
+
+      # Every value the comment author controls arrives through env, never
+      # interpolated into the script. A ${{ }} expression is pasted in before
+      # the shell parses anything, so a comment body containing a quote and a
+      # semicolon would otherwise run as code — with a token that can write to
+      # the runner repository.
+      - name: Run the command
+        env:
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          IS_PULL_REQUEST: ${{ github.event.issue.pull_request != null }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+          RUNNER_REPOSITORY:
+            ${{ github.repository_owner }}/${{ inputs.runner-repository }}
+          RUNNER_WORKFLOW: ${{ inputs.runner-workflow }}
+        run: |
+          set -euo pipefail
+
+          # The comment marker Renovate puts in every pull request body, beside
+          # the checkbox a person would otherwise tick by hand. Ticking it is
+          # the whole trick: Renovate has no comment commands, but it does read
+          # this box on its next run, and a workflow can tick it exactly as a
+          # click does.
+          marker='<!-- rebase-check -->'
+
+          react() {
+            gh api --silent --method POST \
+              "repos/${REPOSITORY}/issues/comments/${COMMENT_ID}/reactions" \
+              --raw-field "content=${1}"
+          }
+
+          # Anchored to the start of a line. GitHub prefixes a quoted reply with
+          # "> ", so quoting somebody else's command repeats it without running
+          # it — which is why the job-level condition above is not enough.
+          if ! mention=$(grep --extended-regexp --max-count=1 --only-matching \
+            '^[[:space:]]*@renovate[[:space:]]+[a-z]+' <<<"${COMMENT_BODY}"); then
+            echo "No @renovate command opens a line of this comment. Nothing to do."
+            exit 0
+          fi
+          command=${mention##* }
+
+          # author_association is free and would avoid this call, but it reports
+          # NONE for a member whose organization membership is private — so the
+          # command would silently ignore the person most likely to be using it.
+          # This asks what the account can actually do instead.
+          permission=$(gh api \
+            "repos/${REPOSITORY}/collaborators/${COMMENT_AUTHOR}/permission" \
+            --jq '.permission')
+          if [[ "${permission}" != admin && "${permission}" != write ]]; then
+            react confused
+            echo "::notice::${COMMENT_AUTHOR} has ${permission} access to ${REPOSITORY}, so \"${command}\" was ignored."
+            exit 0
+          fi
+
+          react eyes
+
+          case "${command}" in
+            rebase | retry | recreate)
+              if [[ "${IS_PULL_REQUEST}" != true ]]; then
+                react confused
+                echo "::error::\"${command}\" needs a pull request, and this is an issue."
+                exit 1
+              fi
+
+              body=$(gh api "repos/${REPOSITORY}/pulls/${ISSUE_NUMBER}" --jq '.body')
+              if [[ "${body}" != *"${marker}"* ]]; then
+                react confused
+                echo "::error::#${ISSUE_NUMBER} has no Renovate rebase checkbox, so there is nothing to tick. Renovate did not open it, or its body was truncated."
+                exit 1
+              fi
+
+              # The brackets are escaped because this is a glob pattern, not a
+              # literal: an unescaped [ ] is a bracket expression matching one
+              # space, and would quietly match nothing at all.
+              ticked=${body//- \[ \] ${marker}/- [x] ${marker}}
+
+              # A no-op when the box is already ticked, which is the right
+              # outcome — the dispatch below is then the whole point of asking.
+              jq --null-input --arg body "${ticked}" '{body: $body}' |
+                gh api --silent --method PATCH \
+                  "repos/${REPOSITORY}/pulls/${ISSUE_NUMBER}" --input -
+              echo "Ticked the rebase checkbox on #${ISSUE_NUMBER}."
+              ;;
+            run) ;;
+            *)
+              react confused
+              echo "::error::Unknown command \"${command}\". Known: rebase, retry, recreate, run."
+              exit 1
+              ;;
+          esac
+
+          gh workflow run "${RUNNER_WORKFLOW}" --repo "${RUNNER_REPOSITORY}"
+          echo "Dispatched ${RUNNER_WORKFLOW} in ${RUNNER_REPOSITORY}."
+          react rocket
