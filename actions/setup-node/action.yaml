@@ -1,0 +1,57 @@
+name: Set up Node
+description:
+  Installs the Node version a repository pins, restores the npm cache, and
+  installs dependencies from the lockfile.
+
+inputs:
+  cache:
+    default: 'true'
+    description:
+      Whether to cache the npm download directory between runs. Set to false for
+      jobs that authenticate against a registry, where the restore costs more
+      than it saves.
+    required: false
+  ignore-scripts:
+    default: 'false'
+    description:
+      Whether to pass --ignore-scripts to npm ci. Set to true for jobs that only
+      need the dependency tree, so a prepare script that downloads browsers or
+      builds native modules does not run.
+    required: false
+  node-version-file:
+    default: .tool-versions
+    description: File the Node version is read from.
+    required: false
+  registry-url:
+    description:
+      Registry to authenticate against, written to a job-level .npmrc. Only
+      publishing jobs need this.
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@v7.0.0
+      with:
+        # Naming the package manager here caches unconditionally. Leaving it
+        # empty falls back to package-manager-cache, which only caches when
+        # package.json declares a packageManager field, so a repository
+        # without one would silently get no cache at all.
+        cache: ${{ inputs.cache == 'true' && 'npm' || '' }}
+        node-version-file: ${{ inputs.node-version-file }}
+        package-manager-cache: ${{ inputs.cache }}
+        registry-url: ${{ inputs.registry-url }}
+
+    # npm ci takes the flag but not a value for it, so the two forms cannot be
+    # collapsed into one interpolated command line.
+    - name: Install dependencies
+      shell: bash
+      env:
+        IGNORE_SCRIPTS: ${{ inputs.ignore-scripts }}
+      run: |
+        if [[ "${IGNORE_SCRIPTS}" == 'true' ]]; then
+          npm ci --ignore-scripts
+        else
+          npm ci
+        fi

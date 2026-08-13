@@ -1,0 +1,24 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+# The application token this repository's own releases are cut with is not
+# configured, so the run falls back to GITHUB_TOKEN and its release pull
+# requests do not start check runs. Nothing here requires a check to merge, so
+# the only cost is that auto-merge cannot fire and the pull request is merged
+# by hand. Supplying app-id and private-key below removes both.
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Propose releases
+    # Referenced by tag rather than by path, so this repository exercises the
+    # same call shape its consumers do. A local ./ reference would resolve to
+    # the branch and quietly diverge from what everyone else runs.
+    uses: kanso-labs/github-actions/.github/workflows/_release-please.yaml@v1.0.0

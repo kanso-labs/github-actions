@@ -1,0 +1,125 @@
+name: Release Please
+
+on:
+  workflow_call:
+    inputs:
+      auto-merge:
+        default: true
+        description:
+          Whether to enable auto-merge on the release pull requests this run
+          opens or updates.
+        required: false
+        type: boolean
+    outputs:
+      paths_released:
+        description: JSON array of the paths that had a release created.
+        value: ${{ jobs.propose.outputs.paths_released }}
+      prs:
+        description: JSON array of the release pull requests opened or updated.
+        value: ${{ jobs.propose.outputs.prs }}
+      release_created:
+        description:
+          Whether a release was created for the root component. Empty in
+          repositories that have no component at the repository root.
+        value: ${{ jobs.propose.outputs.release_created }}
+      releases_created:
+        description: Whether any release was created.
+        value: ${{ jobs.propose.outputs.releases_created }}
+      tag_name:
+        description: Tag the root component's release was cut at.
+        value: ${{ jobs.propose.outputs.tag_name }}
+      version:
+        description: Full semver version of the root component's release.
+        value: ${{ jobs.propose.outputs.version }}
+    secrets:
+      app-id:
+        description:
+          Identifier of a GitHub App installed on the calling repository. Supply
+          this together with private-key. Without both, the run falls back to
+          GITHUB_TOKEN and the release pull requests it opens will not start any
+          workflow runs.
+        required: false
+      private-key:
+        description: Private key of the GitHub App named by app-id.
+        required: false
+
+# Every release merge pushes the default branch, and every push starts a run.
+# Several merges landing inside a minute start overlapping runs that try to cut
+# the same tags and strip the same labels, and one of them dies on the loser's
+# half-finished work. Do not add cancel-in-progress: the last push must still
+# get a run, or the release it carries is never proposed.
+concurrency:
+  cancel-in-progress: false
+  group: release-please-${{ github.repository }}
+
+# Deliberately no permissions block. The caller grants what its token needs,
+# and that differs: a repository using the application token below can leave
+# GITHUB_TOKEN on contents: read, while one falling back to it needs contents,
+# issues and pull-requests at write. Declaring write here would fail the run
+# for the first kind rather than let it keep the tighter grant.
+
+jobs:
+  propose:
+    name: Propose releases
+    runs-on: ubuntu-latest
+    outputs:
+      paths_released: ${{ steps.release.outputs.paths_released }}
+      prs: ${{ steps.release.outputs.prs }}
+      release_created: ${{ steps.release.outputs.release_created }}
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    env:
+      # The secrets context is not available to a step's if condition, so the
+      # presence check has to read the value through env instead.
+      APP_ID: ${{ secrets.app-id }}
+    steps:
+      # Pull requests opened with the default GITHUB_TOKEN do not start
+      # workflow runs. Their checks sit at action_required until somebody
+      # approves them by hand, so a release stalls until then. Requests made
+      # with an application token trigger the checks like any other.
+      - name: Mint an application token
+        id: app-token
+        if: env.APP_ID != ''
+        uses: actions/create-github-app-token@v3.2.0
+        with:
+          app-id: ${{ secrets.app-id }}
+          private-key: ${{ secrets.private-key }}
+
+      - name: Warn that no application token was supplied
+        if: env.APP_ID == ''
+        run: |
+          echo '::warning::No app-id secret was supplied, so this run used GITHUB_TOKEN. The release pull request will open, but it will not start any workflow runs, so required checks never report and auto-merge never fires. Merge it by hand, or install a GitHub App and pass app-id and private-key.'
+
+      # A skipped step's outputs are empty strings, so this falls through to
+      # the default token whenever the application token was not minted.
+      - name: Propose releases
+        id: release
+        uses: googleapis/release-please-action@v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token || github.token }}
+
+      # Auto-merge only queues when something is already blocking the pull
+      # request, which is normally a ruleset requiring status checks. Remove
+      # that rule and this stops waiting for anything: --auto on an unblocked
+      # pull request merges it on the spot.
+      #
+      # Failing to enable it is not worth failing the run over. The release
+      # pull request itself is already open and correct, and merging it by hand
+      # still works, so this warns and moves on.
+      - name: Enable auto-merge on the release pull requests
+        if:
+          inputs.auto-merge && steps.release.outputs.prs != '' &&
+          steps.release.outputs.prs != '[]'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          GH_REPO: ${{ github.repository }}
+          PRS: ${{ steps.release.outputs.prs }}
+        run: |
+          jq -r '.[].number' <<< "${PRS}" | while read -r pr; do
+            if gh pr merge --auto --squash "${pr}"; then
+              echo "Auto-merge enabled on #${pr}."
+            else
+              echo "::warning::Could not enable auto-merge on #${pr}. Merge it by hand."
+            fi
+          done

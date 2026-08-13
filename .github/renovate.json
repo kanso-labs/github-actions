@@ -1,0 +1,18 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "minimumReleaseAge": null,
+  "packageRules": [
+    {
+      "automerge": true,
+      "matchUpdateTypes": ["minor", "patch"]
+    }
+  ],
+  "prConcurrentLimit": 0,
+  "prHourlyLimit": 0,
+  "rebaseWhen": "behind-base-branch",
+  "recreateWhen": "always",
+  "vulnerabilityAlerts": {
+    "enabled": false
+  }
+}

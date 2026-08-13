@@ -1,0 +1,41 @@
+name: Lint
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint-workflows:
+    name: Lint workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Run actionlint
+        uses: raven-actions/actionlint@v2.2.0
+        with:
+          fail-on-error: true
+
+  # This job is also the smoke test for the composite action. It is the only
+  # place in this repository that runs it, and a change breaking the action
+  # fails here rather than in whichever repository next pins a new version.
+  check-formatting:
+    name: Check formatting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Node
+        uses: ./actions/setup-node
+
+      - name: Check formatting
+        run: npm run lint
