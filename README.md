@@ -66,10 +66,17 @@ there — and if the repository requires status checks to merge, auto-merge can
 never fire, because the checks it is waiting for never report. Requests made
 with a GitHub App token trigger checks like any other.
 
-Both `app-id` and `private-key` are optional. Without them the run falls back to
-`GITHUB_TOKEN`, warns in the job log, and still opens a correct release pull
+Both `client-id` and `private-key` are optional. Without them the run falls back
+to `GITHUB_TOKEN`, warns in the job log, and still opens a correct release pull
 request — it just has to be merged by a person. That fallback is what lets a
 repository adopt this workflow before its secrets are in place.
+
+`app-id` is a deprecated alias for `client-id` and still works. Both workflows
+here accept either, and both pass whatever they get to the action's `client-id`
+input, because the action's own `app-id` is deprecated and warns on every run. A
+GitHub App id and a client id are interchangeable at the point that matters:
+each is accepted as the JWT issuer. The three `_release-please.yaml` consumers
+still pass `app-id`, and nothing forces them to move.
 
 **In fallback mode, auto-merge is disabled no matter what `auto-merge` is set
 to.** Merging the release pull request is only half of a release: that merge
@@ -98,10 +105,10 @@ merges on the spot.
 The workflow deliberately declares no `permissions` block, because what the
 caller needs depends on which token it uses:
 
-| Caller supplies            | Needs at workflow level                                    |
-| -------------------------- | ---------------------------------------------------------- |
-| `app-id` and `private-key` | `contents: read` — the app token does the writing          |
-| Neither                    | `contents: write`, `issues: write`, `pull-requests: write` |
+| Caller supplies               | Needs at workflow level                                    |
+| ----------------------------- | ---------------------------------------------------------- |
+| `client-id` and `private-key` | `contents: read` — the app token does the writing          |
+| Neither                       | `contents: write`, `issues: write`, `pull-requests: write` |
 
 A called workflow cannot request more than its caller granted, so declaring
 write here would force the first kind to widen its `GITHUB_TOKEN` for no reason.
@@ -165,7 +172,7 @@ jobs:
     name: Run the command
     uses: kanso-labs/github-actions/.github/workflows/_renovate-command.yaml@v1.1.0
     secrets:
-      app-id: ${{ secrets.RENOVATE_APP_ID }}
+      client-id: ${{ secrets.RENOVATE_CLIENT_ID }}
       private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
 ```
 
