@@ -25,6 +25,10 @@ does for every other action these repositories pin.
 ```
 
 ```yaml
+concurrency:
+  cancel-in-progress: false
+  group: release-please
+
 jobs:
   release-please:
     name: Propose releases
@@ -33,6 +37,8 @@ jobs:
       app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
       private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
 ```
+
+That `concurrency` block is not optional — see below.
 
 Tracking `@main` instead would mean a mistake here breaks CI in every consuming
 repository at once, with no way to hold one back. That is the whole reason for
@@ -49,8 +55,8 @@ step left behind is doing nothing.
 
 ## `_release-please.yaml`
 
-Wraps `googleapis/release-please-action` with the three things that were only
-ever configured in one repository:
+Wraps `googleapis/release-please-action` with the things that were only ever
+configured in one repository:
 
 **An application token, when the caller supplies one.** Pull requests opened
 with the default `GITHUB_TOKEN` do not start workflow runs. Their checks sit at
@@ -63,12 +69,6 @@ Both `app-id` and `private-key` are optional. Without them the run falls back to
 `GITHUB_TOKEN`, warns in the job log, and still opens a correct release pull
 request — it just has to be merged by hand. That fallback is what lets a
 repository adopt this workflow before its secrets are in place.
-
-**A concurrency group.** Every release merge pushes the default branch, and
-every push starts a run. Overlapping runs try to cut the same tags and strip the
-same labels, and one dies on the other's half-finished work.
-`cancel-in-progress` is deliberately off: the last push must still get a run, or
-the release it carries is never proposed.
 
 **Auto-merge on the release pull requests.** Enabled by default; pass
 `auto-merge: false` to turn it off. Note that `--auto` only queues when
@@ -87,6 +87,22 @@ caller needs depends on which token it uses:
 
 A called workflow cannot request more than its caller granted, so declaring
 write here would force the first kind to widen its `GITHUB_TOKEN` for no reason.
+
+### The caller owns the concurrency group
+
+Overlapping release-please runs race each other. Every release merge pushes the
+default branch, every push starts a run, and two runs landing together try to
+cut the same tags and strip the same labels — one then dies on the other's
+half-finished work. `cancel-in-progress` stays off, because the last push must
+still get a run or the release it carries is never proposed.
+
+The guard is required, and it goes in the caller. GitHub documents `concurrency`
+at the caller and says nothing either way about a group declared inside a called
+workflow, and a guard that only matters during a rare race is the worst thing to
+rest on undocumented behaviour: if it quietly did nothing, every consumer would
+lose it at once and nobody would learn that until the race happened. In the
+caller it is supported, it is visible in review, and forgetting it costs one
+repository instead of all of them.
 
 ### Outputs
 

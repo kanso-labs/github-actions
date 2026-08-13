@@ -43,14 +43,15 @@ on:
         description: Private key of the GitHub App named by app-id.
         required: false
 
-# Every release merge pushes the default branch, and every push starts a run.
-# Several merges landing inside a minute start overlapping runs that try to cut
-# the same tags and strip the same labels, and one of them dies on the loser's
-# half-finished work. Do not add cancel-in-progress: the last push must still
-# get a run, or the release it carries is never proposed.
-concurrency:
-  cancel-in-progress: false
-  group: release-please-${{ github.repository }}
+# Deliberately no concurrency block, and the caller has to carry one instead.
+# Overlapping release-please runs race each other, so the guard is not optional
+# — but GitHub documents concurrency at the caller, and says nothing either way
+# about a group declared in a called workflow. A guard that only matters during
+# a rare race is the worst possible place to rely on undocumented behaviour: if
+# it silently did nothing here, every consumer would lose it at once and none
+# of them would find out until the race actually happened. At the caller it is
+# supported, it is visible in review, and forgetting it costs one repository
+# rather than all of them. README.md carries the block to copy.
 
 # Deliberately no permissions block. The caller grants what its token needs,
 # and that differs: a repository using the application token below can leave

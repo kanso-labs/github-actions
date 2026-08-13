@@ -93,6 +93,13 @@ application token leaves `GITHUB_TOKEN` on `contents: read` while one falling
 back to it needs three write scopes. Adding a block here would break the first
 kind.
 
+**The concurrency guard lives in the caller, and that is deliberate.** Do not
+move it into `_release-please.yaml` to save the repetition. GitHub documents
+`concurrency` at the caller and says nothing about a group declared in a called
+workflow, so moving it there would bet a guard that only matters during a rare
+race on undocumented behaviour — and if it turned out to be a no-op, all three
+consumers would lose it silently and simultaneously.
+
 **The `secrets` context is not available to an `if:` condition.** Not at job
 level and not at step level. Checking whether a secret was supplied means
 copying it to a job-level `env` first and testing `env.X != ''`, which is what
