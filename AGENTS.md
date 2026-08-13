@@ -12,11 +12,12 @@ it is what consumers read.
 
 Consumers today:
 
-| Repository                                                                               | Uses                   |
-| ---------------------------------------------------------------------------------------- | ---------------------- |
-| [home-assistant-applications](https://github.com/kanso-labs/home-assistant-applications) | `_release-please.yaml` |
-| [kanso-ui](https://github.com/kanso-labs/kanso-ui)                                       | both                   |
-| [unplugin-style-dictionary](https://github.com/kanso-labs/unplugin-style-dictionary)     | both                   |
+| Repository                                                                               | Uses                                         |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------- |
+| [home-assistant-applications](https://github.com/kanso-labs/home-assistant-applications) | `_release-please.yaml`                       |
+| [kanso-ui](https://github.com/kanso-labs/kanso-ui)                                       | `_release-please.yaml`, `actions/setup-node` |
+| [renovate](https://github.com/kanso-labs/renovate)                                       | `_renovate-command.yaml`                     |
+| [unplugin-style-dictionary](https://github.com/kanso-labs/unplugin-style-dictionary)     | `_release-please.yaml`, `actions/setup-node` |
 
 Nothing here is used by one repository alone. A change that looks obviously
 right in the shape one consumer calls it can still be wrong for the other two,
@@ -92,6 +93,22 @@ it by hand as well:
 Do this in `unplugin-style-dictionary` rather than
 `home-assistant-applications`: it has one package, no application token, and
 nothing installed depends on its releases.
+
+`_renovate-command` canaries in `renovate`, its only consumer and the one place
+an open Renovate pull request is always available to comment on. Two things
+about it differ from the recipe above:
+
+**The caller cannot be canaried from a branch.** `issue_comment` is a
+repository-level event, so GitHub runs whatever version of the workflow file is
+on the default branch and ignores every other copy. Step 2 above is impossible.
+The caller has to be merged to `main` first, with its `uses:` ref pointed at the
+branch here, and the pin moved to the released tag afterwards.
+
+**A green run is not evidence.** The job exits 0 on an unrecognised command, on
+an unauthorised author, and on a comment that turns out not to hold a command at
+all — all deliberate, so that a stranger's typo does not put a red X on a pull
+request. Read what the run logged and check the reaction that landed on the
+comment, rather than its colour.
 
 ## Traps
 

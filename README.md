@@ -9,10 +9,11 @@ them to consume these. A private consumer would need
 
 ## What is here
 
-| Thing                                                            | Kind              | Solves                                                      |
-| ---------------------------------------------------------------- | ----------------- | ----------------------------------------------------------- |
-| [`actions/setup-node`](actions/setup-node)                       | Composite action  | The Node setup preamble repeated in every Node CI job       |
-| [`_release-please.yaml`](.github/workflows/_release-please.yaml) | Reusable workflow | Proposing releases, with a token whose pull requests run CI |
+| Thing                                                                | Kind              | Solves                                                                  |
+| -------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------- |
+| [`actions/setup-node`](actions/setup-node)                           | Composite action  | The Node setup preamble repeated in every Node CI job                   |
+| [`_release-please.yaml`](.github/workflows/_release-please.yaml)     | Reusable workflow | Proposing releases, with a token whose pull requests run CI             |
+| [`_renovate-command.yaml`](.github/workflows/_renovate-command.yaml) | Reusable workflow | Answering `@renovate rebase` on a pull request, the way Dependabot does |
 
 ## Consuming them
 
@@ -139,6 +140,100 @@ publish:
   needs: release-please
   if: needs.release-please.outputs.release_created == 'true'
 ```
+
+## `_renovate-command.yaml`
+
+Renovate has no comment commands. Asking it to redo a pull request means ticking
+a checkbox in the body and then waiting for its next scheduled run, which in
+this organization is up to three hours away. This workflow closes both halves of
+that gap, so `@renovate rebase` behaves the way `@dependabot rebase` does.
+
+```yaml
+on:
+  issue_comment:
+    types:
+      - created
+
+concurrency:
+  cancel-in-progress: false
+  group: renovate-command-${{ github.event.issue.number }}
+
+permissions: {}
+
+jobs:
+  renovate-command:
+    name: Run the command
+    uses: kanso-labs/github-actions/.github/workflows/_renovate-command.yaml@v1.1.0
+    secrets:
+      app-id: ${{ secrets.RENOVATE_APP_ID }}
+      private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+```
+
+| Comment                                                     | Effect                                                               |
+| ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| `@renovate rebase`, `@renovate retry`, `@renovate recreate` | Ticks the pull request's rebase checkbox, then dispatches the runner |
+| `@renovate run`                                             | Dispatches the runner without touching the pull request              |
+
+The three pull request commands are one command under three names, because which
+name is right depends on what Renovate decides to do with the branch, and nobody
+asking for it knows that yet. Renovate's own checkbox says "rebase/retry", and
+it recreates the branch when the rebase is not enough.
+
+The bot reacts as it goes: 👀 accepted, 🚀 dispatched, 😕 refused. A refusal is
+never a failed run, so somebody's typo does not put a red X on the pull request.
+
+### It ticks the box rather than replacing it
+
+There is no API for "rebase this Renovate branch", and the workflow does not try
+to rebase anything itself. It edits the pull request body, turning
+`- [ ] <!-- rebase-check -->` into `- [x] <!-- rebase-check -->` — byte for byte
+what GitHub records when a person clicks that checkbox — and then dispatches the
+runner so Renovate reads it now instead of in three hours.
+
+Everything that decides what "rebase" means stays inside Renovate. That is the
+point: the workflow adds a way to ask, not a second implementation of the
+answer.
+
+It follows that the commands only work on pull requests Renovate opened. On
+anything else the marker is absent and the run fails loudly, which is the honest
+outcome — the alternative is a 👍 on a request nothing will ever act on.
+
+### Both secrets are required
+
+Unlike `_release-please.yaml`, there is no `GITHUB_TOKEN` fallback, because
+`GITHUB_TOKEN` cannot dispatch a workflow in another repository under any
+permissions. The app must be installed on the calling repository and on the
+runner, and needs `actions: write` there — the permission nothing else in this
+organization uses.
+
+The caller grants no permissions at all. Every write goes through the app token,
+so this workflow can and does declare `permissions: {}`, which is the opposite
+of `_release-please.yaml` above and for a reason worth keeping straight: a
+called workflow may always request _less_ than its caller granted. It is
+requesting more that fails the run.
+
+### Adopting it takes two merges, not one
+
+`issue_comment` is a repository-level event. GitHub runs the copy of the
+workflow that is on the default branch and ignores every other copy, so a caller
+sitting on a branch does nothing no matter how many comments it gets — and
+neither does a change to one.
+
+A repository adopting this therefore merges the caller first and finds out
+whether it works second. Point the `uses:` ref at a branch of this repository
+for that first merge if the workflow itself is what is being tried out, then
+move it to a tag.
+
+### Who may run a command
+
+The comment author must have `write` or `admin` on the repository the comment is
+in. The check asks GitHub for the permission level rather than reading
+`author_association`, which is free but reports `NONE` for a member whose
+organization membership is private — silently ignoring the person most likely to
+be using this.
+
+The mention must also open a line. GitHub prefixes a quoted reply with `> `, so
+quoting a command repeats it without running it.
 
 ## Releasing this repository
 
