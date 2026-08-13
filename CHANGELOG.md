@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/kanso-labs/github-actions/compare/v1.0.2...v1.1.0) (2026-08-13)
+
+
+### Features
+
+* test the release workflow on pull requests ([#5](https://github.com/kanso-labs/github-actions/issues/5)) ([e43e127](https://github.com/kanso-labs/github-actions/commit/e43e1278dacf731ce2e16bc201959b30efb87d7d))
+
 ## [1.0.2](https://github.com/kanso-labs/github-actions/compare/v1.0.1...v1.0.2) (2026-08-13)
 
 
