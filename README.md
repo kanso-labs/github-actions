@@ -121,6 +121,13 @@ lose it at once and nobody would learn that until the race happened. In the
 caller it is supported, it is visible in review, and forgetting it costs one
 repository instead of all of them.
 
+### `dry-run`
+
+Runs release-please without opening a pull request or cutting a release. It
+exists so this workflow can be tested on a pull request, and
+`Dry run release-please` in `test.yaml` is its only caller. A repository
+releasing for real has no reason to set it.
+
 ### Outputs
 
 `release_created`, `releases_created`, `paths_released`, `prs`, `tag_name` and

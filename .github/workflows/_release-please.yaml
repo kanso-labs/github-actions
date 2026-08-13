@@ -10,6 +10,15 @@ on:
           opens or updates.
         required: false
         type: boolean
+      dry-run:
+        default: false
+        description:
+          Run release-please without opening a pull request or cutting a
+          release. Exists so that this workflow can be exercised on a pull
+          request, where a real run would otherwise write to the repository. Not
+          something a release caller should set.
+        required: false
+        type: boolean
     outputs:
       paths_released:
         description: JSON array of the paths that had a release created.
@@ -98,6 +107,13 @@ jobs:
         id: release
         uses: googleapis/release-please-action@v5.0.0
         with:
+          # Both skips together are what make dry-run write nothing: one
+          # suppresses the pull request, the other the tag and release. With
+          # them set, the step still resolves the config, walks the commits and
+          # computes the versions — which is the part worth exercising, and the
+          # part a bad bump to this action would break.
+          skip-github-pull-request: ${{ inputs.dry-run }}
+          skip-github-release: ${{ inputs.dry-run }}
           token: ${{ steps.app-token.outputs.token || github.token }}
 
       # Requires the application token, not just the auto-merge input. Merging
@@ -118,10 +134,15 @@ jobs:
       # Failing to enable it is not worth failing the run over. The release
       # pull request itself is already open and correct, and merging it by hand
       # still works, so this warns and moves on.
+      #
+      # The dry-run test cannot reach this anyway, since skipping the pull
+      # request leaves prs empty, but it is named in the condition regardless.
+      # A step that merges things should say when it does not run rather than
+      # rely on another output happening to be empty.
       - name: Enable auto-merge on the release pull requests
         if:
-          inputs.auto-merge && env.APP_ID != '' && steps.release.outputs.prs !=
-          '' && steps.release.outputs.prs != '[]'
+          inputs.auto-merge && !inputs.dry-run && env.APP_ID != '' &&
+          steps.release.outputs.prs != '' && steps.release.outputs.prs != '[]'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
           GH_REPO: ${{ github.repository }}

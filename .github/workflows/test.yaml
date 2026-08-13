@@ -1,0 +1,33 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  # _release-please.yaml is the one thing here that nothing exercised. The
+  # composite action has a live smoke test in lint.yaml, but this workflow only
+  # ever runs on a push to a default branch, so the two actions it pins —
+  # release-please-action and create-github-app-token — reached main having
+  # never been started, and then ran for real in four repositories at once.
+  #
+  # This calls it in dry-run, where release-please still resolves the config,
+  # walks the commits and computes versions, but opens no pull request and cuts
+  # no release. No secrets are passed, so it also covers the GITHUB_TOKEN
+  # fallback path and the warning that goes with it.
+  #
+  # Referenced by path rather than by tag, and that is the opposite of what
+  # release-please.yaml does on purpose. That one pins a tag so this repository
+  # runs what its consumers run; this one has to test the version in the pull
+  # request, which is the only version not yet released.
+  release-please:
+    name: Dry run release-please
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_release-please.yaml
+    with:
+      dry-run: true

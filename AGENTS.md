@@ -70,9 +70,19 @@ repository next bumps its pin. That is the only job in this repository that
 exercises it — keep it that way round, and do not "tidy" it into a plain
 `actions/setup-node` step.
 
-**A reusable workflow has no equivalent, so canary it by hand.**
-`_release-please` only does anything on a push to a default branch with a real
-token, which no pull request here reproduces. Before merging a change to it:
+**The reusable workflow has one too, in dry-run.** `Dry run release-please` in
+[`test.yaml`](.github/workflows/test.yaml) calls
+`./.github/workflows/_release-please.yaml` with `dry-run: true`, so
+release-please resolves the config, walks the commits and computes versions
+while opening no pull request and cutting no release. It passes no secrets, so
+it covers the `GITHUB_TOKEN` fallback and its warning as well. That path
+reference is deliberate and is the opposite of what `release-please.yaml` does:
+the test has to run the version in the pull request, which is the only version
+not yet released.
+
+What it does not cover is the application-token path, or anything that only
+happens on a real push to a default branch. For a change touching those, canary
+it by hand as well:
 
 1. Push a branch here with the change.
 2. On a branch in one consumer, flip its `uses:` ref to that branch.
