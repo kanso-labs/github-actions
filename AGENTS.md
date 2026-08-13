@@ -97,10 +97,17 @@ kind.
 decides whether the other half happens.** The merge pushes the default branch,
 and the run that push starts is what cuts the tag and the GitHub release. A push
 made with `GITHUB_TOKEN` starts no run, so auto-merging in the fallback path
-strands the release: version bumped on the branch, nothing tagged, and no pull
-request left to merge by hand. That is why the auto-merge step tests
-`env.APP_ID != ''` as well as its own input. This happened for real on v1.0.1 of
-this repository, which had to be tagged by hand afterwards.
+leaves the release half-applied: the version is bumped and the changelog written
+on the branch, but nothing is tagged and no GitHub release exists. That is why
+the auto-merge step tests `env.APP_ID != ''` as well as its own input.
+
+It recovers on its own, which is what makes it easy to miss. The next push to
+the default branch — any push, for any reason — starts a run that finds the
+merged release pull request still labelled `autorelease: pending` and cuts the
+tag then. On a quiet repository that is however long it takes somebody to push
+something else, and until it happens the version in `version.txt` is one no
+consumer can pin, because the tag it names does not exist. Both v1.0.1 and
+v1.0.2 of this repository were released that way.
 
 **The concurrency guard lives in the caller, and that is deliberate.** Do not
 move it into `_release-please.yaml` to save the repetition. GitHub documents

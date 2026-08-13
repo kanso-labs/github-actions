@@ -74,9 +74,12 @@ repository adopt this workflow before its secrets are in place.
 to.** Merging the release pull request is only half of a release: that merge
 pushes the default branch, and the run it starts is what cuts the tag and the
 GitHub release. A push made with `GITHUB_TOKEN` starts no run, so auto-merging
-as it strands the release — version bumped on the branch, nothing tagged, and no
-pull request left to merge. A person's merge does start that run, so the
-fallback leaves the merge to them.
+as it leaves the release half-applied: the version is bumped and the changelog
+written, but nothing is tagged. The next push to the default branch, whenever
+that happens and whatever it is for, cuts the tag late — so on a quiet
+repository the released version spends an unbounded stretch being one that
+nobody can pin. A person's merge starts the run immediately, so the fallback
+leaves the merge to them.
 
 A repository whose ruleset requires status checks cannot really use the fallback
 at all: the release pull request never starts the checks it is required to pass,
