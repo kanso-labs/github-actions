@@ -67,8 +67,22 @@ with a GitHub App token trigger checks like any other.
 
 Both `app-id` and `private-key` are optional. Without them the run falls back to
 `GITHUB_TOKEN`, warns in the job log, and still opens a correct release pull
-request — it just has to be merged by hand. That fallback is what lets a
+request — it just has to be merged by a person. That fallback is what lets a
 repository adopt this workflow before its secrets are in place.
+
+**In fallback mode, auto-merge is disabled no matter what `auto-merge` is set
+to.** Merging the release pull request is only half of a release: that merge
+pushes the default branch, and the run it starts is what cuts the tag and the
+GitHub release. A push made with `GITHUB_TOKEN` starts no run, so auto-merging
+as it strands the release — version bumped on the branch, nothing tagged, and no
+pull request left to merge. A person's merge does start that run, so the
+fallback leaves the merge to them.
+
+A repository whose ruleset requires status checks cannot really use the fallback
+at all: the release pull request never starts the checks it is required to pass,
+so nobody without bypass can merge it. `kanso-ui` and
+`unplugin-style-dictionary` are both in that position, which is the real reason
+they need the app installed rather than a stylistic one.
 
 **Auto-merge on the release pull requests.** Enabled by default; pass
 `auto-merge: false` to turn it off. Note that `--auto` only queues when

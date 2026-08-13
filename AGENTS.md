@@ -93,6 +93,15 @@ application token leaves `GITHUB_TOKEN` on `contents: read` while one falling
 back to it needs three write scopes. Adding a block here would break the first
 kind.
 
+**Merging a release pull request is only half a release, and who merges it
+decides whether the other half happens.** The merge pushes the default branch,
+and the run that push starts is what cuts the tag and the GitHub release. A push
+made with `GITHUB_TOKEN` starts no run, so auto-merging in the fallback path
+strands the release: version bumped on the branch, nothing tagged, and no pull
+request left to merge by hand. That is why the auto-merge step tests
+`env.APP_ID != ''` as well as its own input. This happened for real on v1.0.1 of
+this repository, which had to be tagged by hand afterwards.
+
 **The concurrency guard lives in the caller, and that is deliberate.** Do not
 move it into `_release-please.yaml` to save the repetition. GitHub documents
 `concurrency` at the caller and says nothing about a group declared in a called

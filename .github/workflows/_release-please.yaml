@@ -90,7 +90,7 @@ jobs:
       - name: Warn that no application token was supplied
         if: env.APP_ID == ''
         run: |
-          echo '::warning::No app-id secret was supplied, so this run used GITHUB_TOKEN. The release pull request will open, but it will not start any workflow runs, so required checks never report and auto-merge never fires. Merge it by hand, or install a GitHub App and pass app-id and private-key.'
+          echo '::warning::No app-id secret was supplied, so this run used GITHUB_TOKEN. Its release pull request will not start any workflow runs, so required checks never report on it, and auto-merge is disabled below because merging it as the token would leave the release half-cut. Merge it yourself — a push by a human does trigger the run that tags it. Installing a GitHub App and passing app-id and private-key removes all of this.'
 
       # A skipped step's outputs are empty strings, so this falls through to
       # the default token whenever the application token was not minted.
@@ -100,7 +100,17 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token || github.token }}
 
-      # Auto-merge only queues when something is already blocking the pull
+      # Requires the application token, not just the auto-merge input. Merging
+      # the release pull request is only half of a release: that merge pushes
+      # the default branch, and the run it starts is what actually cuts the tag
+      # and the GitHub release. A push made with GITHUB_TOKEN starts no run at
+      # all, so auto-merging as it strands the release with its version bumped
+      # on the branch and nothing tagged — worse than not auto-merging, because
+      # the pull request is now closed and there is nothing left to merge by
+      # hand. A human's merge does start that run, so the fallback path leaves
+      # this to them.
+      #
+      # Auto-merge also only queues when something is already blocking the pull
       # request, which is normally a ruleset requiring status checks. Remove
       # that rule and this stops waiting for anything: --auto on an unblocked
       # pull request merges it on the spot.
@@ -110,8 +120,8 @@ jobs:
       # still works, so this warns and moves on.
       - name: Enable auto-merge on the release pull requests
         if:
-          inputs.auto-merge && steps.release.outputs.prs != '' &&
-          steps.release.outputs.prs != '[]'
+          inputs.auto-merge && env.APP_ID != '' && steps.release.outputs.prs !=
+          '' && steps.release.outputs.prs != '[]'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
           GH_REPO: ${{ github.repository }}
