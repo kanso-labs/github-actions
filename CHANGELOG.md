@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/kanso-labs/github-actions/compare/v1.1.0...v1.2.0) (2026-08-13)
+
+
+### Features
+
+* answer Renovate comment commands ([#7](https://github.com/kanso-labs/github-actions/issues/7)) ([4c27183](https://github.com/kanso-labs/github-actions/commit/4c271831f7eb34a9c360e60d50b1b50b15148b02))
+
 ## [1.1.0](https://github.com/kanso-labs/github-actions/compare/v1.0.2...v1.1.0) (2026-08-13)
 
 
