@@ -18,12 +18,6 @@ on:
         required: false
         type: string
     secrets:
-      app-id:
-        description:
-          Deprecated alias for client-id, taking an app id rather than a client
-          id. Kept because renaming an input breaks every caller pinned to an
-          older tag the moment they bump. Pass one or the other, not both.
-        required: false
       client-id:
         description:
           Client ID of a GitHub App installed on both this repository and the
@@ -66,10 +60,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v3.2.0
         with:
-          # An unsupplied secret is an empty string, so this falls through to
-          # the deprecated input when only that one was passed. Supplying
-          # neither is caught by the action, whose own error names both.
-          client-id: ${{ secrets.client-id || secrets.app-id }}
+          client-id: ${{ secrets.client-id }}
           owner: ${{ github.repository_owner }}
           private-key: ${{ secrets.private-key }}
           repositories: |

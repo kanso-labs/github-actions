@@ -126,7 +126,7 @@ and the run that push starts is what cuts the tag and the GitHub release. A push
 made with `GITHUB_TOKEN` starts no run, so auto-merging in the fallback path
 leaves the release half-applied: the version is bumped and the changelog written
 on the branch, but nothing is tagged and no GitHub release exists. That is why
-the auto-merge step tests `env.APP_ID != ''` as well as its own input.
+the auto-merge step tests `env.CLIENT_ID != ''` as well as its own input.
 
 It recovers on its own, which is what makes it easy to miss. The next push to
 the default branch — any push, for any reason — starts a run that finds the

@@ -22,7 +22,7 @@ does for every other action these repositories pin.
 
 ```yaml
 - name: Set up Node
-  uses: kanso-labs/github-actions/actions/setup-node@v1.0.0
+  uses: kanso-labs/github-actions/actions/setup-node@v2.0.0
 ```
 
 ```yaml
@@ -33,9 +33,9 @@ concurrency:
 jobs:
   release-please:
     name: Propose releases
-    uses: kanso-labs/github-actions/.github/workflows/_release-please.yaml@v1.0.0
+    uses: kanso-labs/github-actions/.github/workflows/_release-please.yaml@v2.0.0
     secrets:
-      app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+      client-id: ${{ secrets.RELEASE_PLEASE_CLIENT_ID }}
       private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
 ```
 
@@ -71,12 +71,12 @@ to `GITHUB_TOKEN`, warns in the job log, and still opens a correct release pull
 request — it just has to be merged by a person. That fallback is what lets a
 repository adopt this workflow before its secrets are in place.
 
-`app-id` is a deprecated alias for `client-id` and still works. Both workflows
-here accept either, and both pass whatever they get to the action's `client-id`
-input, because the action's own `app-id` is deprecated and warns on every run. A
-GitHub App id and a client id are interchangeable at the point that matters:
-each is accepted as the JWT issuer. The three `_release-please.yaml` consumers
-still pass `app-id`, and nothing forces them to move.
+**There is no `app-id` input.** Both workflows took one as a deprecated alias
+through v1.x and dropped it in v2.0.0, which is what makes v2 a major. A caller
+bumping to v2 has to rename the secret it passes; the value need not change,
+since a GitHub App id and a client id are interchangeable where it lands — each
+is accepted as the JWT issuer. Passing an app id under the `client-id` name
+still works, so the rename can be done before the secret is.
 
 **In fallback mode, auto-merge is disabled no matter what `auto-merge` is set
 to.** Merging the release pull request is only half of a release: that merge
@@ -170,7 +170,7 @@ permissions: {}
 jobs:
   renovate-command:
     name: Run the command
-    uses: kanso-labs/github-actions/.github/workflows/_renovate-command.yaml@v1.1.0
+    uses: kanso-labs/github-actions/.github/workflows/_renovate-command.yaml@v2.0.0
     secrets:
       client-id: ${{ secrets.RENOVATE_CLIENT_ID }}
       private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}

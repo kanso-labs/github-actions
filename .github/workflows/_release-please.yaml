@@ -41,12 +41,6 @@ on:
         description: Full semver version of the root component's release.
         value: ${{ jobs.propose.outputs.version }}
     secrets:
-      app-id:
-        description:
-          Deprecated alias for client-id, taking an app id rather than a client
-          id. All three consumers still pass this, so it stays. Pass one or the
-          other, not both.
-        required: false
       client-id:
         description:
           Client ID of a GitHub App installed on the calling repository. Supply
@@ -87,10 +81,8 @@ jobs:
       version: ${{ steps.release.outputs.version }}
     env:
       # The secrets context is not available to a step's if condition, so the
-      # presence check has to read the value through env instead. Either input
-      # counts as "a credential was supplied", which is all the checks below
-      # ask about.
-      CLIENT_ID: ${{ secrets.client-id || secrets.app-id }}
+      # presence check has to read the value through env instead.
+      CLIENT_ID: ${{ secrets.client-id }}
     steps:
       # Pull requests opened with the default GITHUB_TOKEN do not start
       # workflow runs. Their checks sit at action_required until somebody
@@ -101,12 +93,7 @@ jobs:
         if: env.CLIENT_ID != ''
         uses: actions/create-github-app-token@v3.2.0
         with:
-          # Both inputs land here, and a caller still passing an app id keeps
-          # working: the action hands whichever value it gets to GitHub as the
-          # JWT issuer, and GitHub accepts an app id there as readily as a
-          # client id. Only the action's own `app-id` input is deprecated, and
-          # not using it is what stops the warning on every run.
-          client-id: ${{ secrets.client-id || secrets.app-id }}
+          client-id: ${{ secrets.client-id }}
           private-key: ${{ secrets.private-key }}
 
       - name: Warn that no application token was supplied
