@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/kanso-labs/github-actions/compare/v1.2.0...v1.2.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* mint the application token here too ([#12](https://github.com/kanso-labs/github-actions/issues/12)) ([c28b412](https://github.com/kanso-labs/github-actions/commit/c28b4123d75118a46909e3de17c25f9a9a616ab7))
+
 ## [1.2.0](https://github.com/kanso-labs/github-actions/compare/v1.1.0...v1.2.0) (2026-08-13)
 
 
