@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/kanso-labs/github-actions/compare/v1.3.0...v2.0.0) (2026-08-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* require the client id and drop the app id alias ([#16](https://github.com/kanso-labs/github-actions/issues/16))
+
+### Features
+
+* require the client id and drop the app id alias ([#16](https://github.com/kanso-labs/github-actions/issues/16)) ([976108e](https://github.com/kanso-labs/github-actions/commit/976108eb44db5ab5ae60da274a722687d1bcef2d))
+
 ## [1.3.0](https://github.com/kanso-labs/github-actions/compare/v1.2.1...v1.3.0) (2026-08-14)
 
 
