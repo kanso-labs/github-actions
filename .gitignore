@@ -1,1 +1,6 @@
 node_modules/
+
+# Agent worktrees. These are checkouts of this repository living inside it, so
+# git records them as gitlinks rather than files, and one `git add -A` is enough
+# to commit a pointer to a commit that exists only on somebody's laptop.
+.claude/worktrees/
