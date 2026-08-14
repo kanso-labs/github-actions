@@ -43,13 +43,19 @@ on:
     secrets:
       app-id:
         description:
-          Identifier of a GitHub App installed on the calling repository. Supply
+          Deprecated alias for client-id, taking an app id rather than a client
+          id. All three consumers still pass this, so it stays. Pass one or the
+          other, not both.
+        required: false
+      client-id:
+        description:
+          Client ID of a GitHub App installed on the calling repository. Supply
           this together with private-key. Without both, the run falls back to
           GITHUB_TOKEN and the release pull requests it opens will not start any
           workflow runs.
         required: false
       private-key:
-        description: Private key of the GitHub App named by app-id.
+        description: Private key of the GitHub App named above.
         required: false
 
 # Deliberately no concurrency block, and the caller has to carry one instead.
@@ -81,8 +87,10 @@ jobs:
       version: ${{ steps.release.outputs.version }}
     env:
       # The secrets context is not available to a step's if condition, so the
-      # presence check has to read the value through env instead.
-      APP_ID: ${{ secrets.app-id }}
+      # presence check has to read the value through env instead. Either input
+      # counts as "a credential was supplied", which is all the checks below
+      # ask about.
+      CLIENT_ID: ${{ secrets.client-id || secrets.app-id }}
     steps:
       # Pull requests opened with the default GITHUB_TOKEN do not start
       # workflow runs. Their checks sit at action_required until somebody
@@ -90,16 +98,21 @@ jobs:
       # with an application token trigger the checks like any other.
       - name: Mint an application token
         id: app-token
-        if: env.APP_ID != ''
+        if: env.CLIENT_ID != ''
         uses: actions/create-github-app-token@v3.2.0
         with:
-          app-id: ${{ secrets.app-id }}
+          # Both inputs land here, and a caller still passing an app id keeps
+          # working: the action hands whichever value it gets to GitHub as the
+          # JWT issuer, and GitHub accepts an app id there as readily as a
+          # client id. Only the action's own `app-id` input is deprecated, and
+          # not using it is what stops the warning on every run.
+          client-id: ${{ secrets.client-id || secrets.app-id }}
           private-key: ${{ secrets.private-key }}
 
       - name: Warn that no application token was supplied
-        if: env.APP_ID == ''
+        if: env.CLIENT_ID == ''
         run: |
-          echo '::warning::No app-id secret was supplied, so this run used GITHUB_TOKEN. Its release pull request will not start any workflow runs, so required checks never report on it, and auto-merge is disabled below because merging it as the token would leave the release half-cut. Merge it yourself — a push by a human does trigger the run that tags it. Installing a GitHub App and passing app-id and private-key removes all of this.'
+          echo '::warning::No client-id secret was supplied, so this run used GITHUB_TOKEN. Its release pull request will not start any workflow runs, so required checks never report on it, and auto-merge is disabled below because merging it as the token would leave the release half-cut. Merge it yourself — a push by a human does trigger the run that tags it. Installing a GitHub App and passing client-id and private-key removes all of this.'
 
       # A skipped step's outputs are empty strings, so this falls through to
       # the default token whenever the application token was not minted.
@@ -141,7 +154,7 @@ jobs:
       # rely on another output happening to be empty.
       - name: Enable auto-merge on the release pull requests
         if:
-          inputs.auto-merge && !inputs.dry-run && env.APP_ID != '' &&
+          inputs.auto-merge && !inputs.dry-run && env.CLIENT_ID != '' &&
           steps.release.outputs.prs != '' && steps.release.outputs.prs != '[]'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}

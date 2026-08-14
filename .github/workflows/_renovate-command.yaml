@@ -20,13 +20,19 @@ on:
     secrets:
       app-id:
         description:
-          Identifier of a GitHub App installed on both this repository and the
+          Deprecated alias for client-id, taking an app id rather than a client
+          id. Kept because renaming an input breaks every caller pinned to an
+          older tag the moment they bump. Pass one or the other, not both.
+        required: false
+      client-id:
+        description:
+          Client ID of a GitHub App installed on both this repository and the
           runner repository. Unlike _release-please.yaml there is no
-          GITHUB_TOKEN fallback and both secrets are required, because
+          GITHUB_TOKEN fallback and a credential is required, because
           GITHUB_TOKEN cannot dispatch a workflow in another repository at all.
-        required: true
+        required: false
       private-key:
-        description: Private key of the GitHub App named by app-id.
+        description: Private key of the GitHub App named above.
         required: true
 
 # Unlike _release-please.yaml, this one can state its permissions, and the
@@ -60,7 +66,10 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v3.2.0
         with:
-          app-id: ${{ secrets.app-id }}
+          # An unsupplied secret is an empty string, so this falls through to
+          # the deprecated input when only that one was passed. Supplying
+          # neither is caught by the action, whose own error names both.
+          client-id: ${{ secrets.client-id || secrets.app-id }}
           owner: ${{ github.repository_owner }}
           private-key: ${{ secrets.private-key }}
           repositories: |
