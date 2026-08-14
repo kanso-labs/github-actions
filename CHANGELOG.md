@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/kanso-labs/github-actions/compare/v1.2.1...v1.3.0) (2026-08-14)
+
+
+### Features
+
+* accept a client id alongside the deprecated app id ([#11](https://github.com/kanso-labs/github-actions/issues/11)) ([61afb90](https://github.com/kanso-labs/github-actions/commit/61afb904b23297c0244f5b3975306438614b2ee9))
+
 ## [1.2.1](https://github.com/kanso-labs/github-actions/compare/v1.2.0...v1.2.1) (2026-08-14)
 
 
