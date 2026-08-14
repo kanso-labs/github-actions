@@ -38,7 +38,7 @@ jobs:
     # Referenced by tag rather than by path, so this repository exercises the
     # same call shape its consumers do. A local ./ reference would resolve to
     # the branch and quietly diverge from what everyone else runs.
-    uses: kanso-labs/github-actions/.github/workflows/_release-please.yaml@v1.2.0
+    uses: kanso-labs/github-actions/.github/workflows/_release-please.yaml@v1.2.1
     secrets:
       app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
       private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
