@@ -29,16 +29,17 @@ jobs:
   # pull request opened with that token starts no runs and so can never report
   # the checks it now has to pass.
   #
-  # app-id rather than client-id because the pinned tag predates the client-id
-  # secret. Both resolve to the same JWT issuer, and app-id stays supported as
-  # an alias, so this moves to client-id whenever the pin next moves — there is
-  # nothing to rush.
+  # Pinned to v1.3.0 rather than to the version this branch will become. A
+  # caller cannot name a tag that does not exist yet, and v1.3.0 is the first
+  # release that takes client-id, so moving the pin here is what lets the secret
+  # name move now rather than after the release. Renovate raises the major
+  # afterwards, and by then this already passes what v2 requires.
   release-please:
     name: Propose releases
     # Referenced by tag rather than by path, so this repository exercises the
     # same call shape its consumers do. A local ./ reference would resolve to
     # the branch and quietly diverge from what everyone else runs.
-    uses: kanso-labs/github-actions/.github/workflows/_release-please.yaml@v1.2.1
+    uses: kanso-labs/github-actions/.github/workflows/_release-please.yaml@v1.3.0
     secrets:
-      app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+      client-id: ${{ secrets.RELEASE_PLEASE_CLIENT_ID }}
       private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
