@@ -17,20 +17,28 @@ concurrency:
   cancel-in-progress: false
   group: release-please
 
-# The application token this repository's own releases are cut with is not
-# configured, so the run falls back to GITHUB_TOKEN and its release pull
-# requests do not start check runs. Nothing here requires a check to merge, so
-# the only cost is that auto-merge cannot fire and the pull request is merged
-# by hand. Supplying app-id and private-key below removes both.
+# The application token below does the writing, so GITHUB_TOKEN stays on read.
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
 
 jobs:
+  # Passes the same organization secrets the other three consumers pass. This
+  # repository was the last one still falling back to GITHUB_TOKEN, from back
+  # when no application existed to mint a token from — which stopped being
+  # harmless once its ruleset began requiring status checks, because a release
+  # pull request opened with that token starts no runs and so can never report
+  # the checks it now has to pass.
+  #
+  # app-id rather than client-id because the pinned tag predates the client-id
+  # secret. Both resolve to the same JWT issuer, and app-id stays supported as
+  # an alias, so this moves to client-id whenever the pin next moves — there is
+  # nothing to rush.
   release-please:
     name: Propose releases
     # Referenced by tag rather than by path, so this repository exercises the
     # same call shape its consumers do. A local ./ reference would resolve to
     # the branch and quietly diverge from what everyone else runs.
     uses: kanso-labs/github-actions/.github/workflows/_release-please.yaml@v1.2.0
+    secrets:
+      app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+      private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
