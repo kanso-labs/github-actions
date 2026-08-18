@@ -36,8 +36,16 @@ Shared with the other `kanso-labs` repositories:
   underscore.
 - **Job names and step names are imperative verb phrases.** Job ids, step ids,
   and matrix keys are exempt.
-- **Prettier formats the YAML, JSON and Markdown here**, and CI checks it. Run
-  `npm run format` before pushing.
+- **Actions are pinned to exact release tags**, `actions/checkout@v7.0.1`, never
+  a moving major or `@main`. Renovate opens the bump pull requests.
+
+Formatting is not shared, and assuming it is will send you to a command that
+does not exist. **Prettier formats the YAML, JSON and Markdown here**, and CI
+checks it — run `npm run format` before pushing. Elsewhere in the organization:
+`home-assistant-applications` matches this, `kanso-ui` uses oxfmt
+(`npm run format`, checked inside `npm run lint`), `unplugin-style-dictionary`
+has no `format` script and runs Prettier only through `eslint-plugin-prettier`
+inside `npm run lint`, and `renovate` has no formatter at all.
 
 ## Versioning
 
