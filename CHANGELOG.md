@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/kanso-labs/github-actions/compare/v2.0.0...v2.1.0) (2026-08-20)
+
+
+### Features
+
+* share npm publishing and workflow linting ([#20](https://github.com/kanso-labs/github-actions/issues/20)) ([143c257](https://github.com/kanso-labs/github-actions/commit/143c257f40affbf82666bcd636eb5adc3ac7f0fe))
+
 ## [2.0.0](https://github.com/kanso-labs/github-actions/compare/v1.3.0...v2.0.0) (2026-08-14)
 
 
