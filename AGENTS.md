@@ -12,12 +12,12 @@ it is what consumers read.
 
 Consumers today:
 
-| Repository                                                                               | Uses                                         |
-| ---------------------------------------------------------------------------------------- | -------------------------------------------- |
-| [home-assistant-applications](https://github.com/kanso-labs/home-assistant-applications) | `_release-please.yaml`                       |
-| [kanso-ui](https://github.com/kanso-labs/kanso-ui)                                       | `_release-please.yaml`, `actions/setup-node` |
-| [renovate](https://github.com/kanso-labs/renovate)                                       | `_renovate-command.yaml`                     |
-| [unplugin-style-dictionary](https://github.com/kanso-labs/unplugin-style-dictionary)     | `_release-please.yaml`, `actions/setup-node` |
+| Repository                                                                               | Uses                                                                                                                  |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| [home-assistant-applications](https://github.com/kanso-labs/home-assistant-applications) | `_release-please.yaml`                                                                                                |
+| [kanso-ui](https://github.com/kanso-labs/kanso-ui)                                       | `_publish-npm.yaml`, `_release-please.yaml`, `_renovate-command.yaml`, `actions/lint-workflows`, `actions/setup-node` |
+| [renovate](https://github.com/kanso-labs/renovate)                                       | `_renovate-command.yaml`                                                                                              |
+| [unplugin-style-dictionary](https://github.com/kanso-labs/unplugin-style-dictionary)     | `_publish-npm.yaml`, `_release-please.yaml`, `_renovate-command.yaml`, `actions/lint-workflows`, `actions/setup-node` |
 
 Nothing here is used by one repository alone. A change that looks obviously
 right in the shape one consumer calls it can still be wrong for the other two,
@@ -53,14 +53,24 @@ Consumers pin exact tags — `@v1.2.3`, never `@main` or `@v1`. Renovate opens t
 bump pull requests.
 
 That is what makes an error here survivable: it reaches one repository at a
-time, in a pull request, rather than all three the moment it merges. Do not
+time, in a pull request, rather than all four the moment it merges. Do not
 "simplify" a consumer to `@main`.
 
 release-please owns `version.txt` and `.release-please-manifest.json`. Nobody
 edits either by hand. Pull requests are squash-merged, so the pull request title
 is the only commit that reaches `main` and the single input to the release:
-`feat` for a minor, `fix` for a patch, `!` for a breaking change, anything else
-releases nothing.
+`feat` for a minor, `fix` and `deps` for a patch, `!` for a breaking change,
+anything else releases nothing.
+
+`deps` is not a Conventional Commits type, and it is here because Renovate's
+default `chore(deps)` is hidden in release-please's defaults — which makes
+release-please decide there are no user-facing commits and open no release pull
+request at all. A run of nothing but upgrades therefore released nothing, and
+consumers pin exact tags, so an upgrade that cuts no release is one nobody can
+pin. `.github/renovate.json` sets `semanticCommitType: deps` and
+`release-please-config.json` gives it a visible **Dependencies** section. That
+section list supersedes release-please's defaults rather than extending them, so
+a type dropped from it becomes invisible rather than merely unstyled.
 
 **Breaking means "a consumer must edit something to keep working"** — removing
 an input, renaming an output, changing a default. Exact pins mean nothing breaks
@@ -72,12 +82,16 @@ the changelog, so the major is the only warning that arrives with the change.
 `npm run lint` and actionlint cover syntax. Neither proves a workflow does what
 it claims — most of what has gone wrong in CI here was valid YAML.
 
-**The composite action has a live smoke test.** `check-formatting` in
-[`lint.yaml`](.github/workflows/lint.yaml) calls `./actions/setup-node`, so a
-change that breaks it fails on the pull request rather than in whichever
-repository next bumps its pin. That is the only job in this repository that
-exercises it — keep it that way round, and do not "tidy" it into a plain
-`actions/setup-node` step.
+**Both composite actions have a live smoke test**, in
+[`lint.yaml`](.github/workflows/lint.yaml): `check-formatting` calls
+`./actions/setup-node` and `lint-workflows` calls `./actions/lint-workflows`, so
+a change that breaks either fails on the pull request rather than in whichever
+repository next bumps its pin. Those are the only jobs in this repository that
+exercise them — keep them that way round, and do not "tidy" either into a plain
+`actions/setup-node` or `raven-actions/actionlint` step.
+
+A local `./` reference is safe there and is not safe inside a reusable workflow;
+see the trap below before copying the pattern into one.
 
 **The reusable workflow has one too, in dry-run.** `Dry run release-please` in
 [`test.yaml`](.github/workflows/test.yaml) calls
@@ -89,7 +103,14 @@ reference is deliberate and is the opposite of what `release-please.yaml` does:
 the test has to run the version in the pull request, which is the only version
 not yet released.
 
-What it does not cover is the application-token path, or anything that only
+**`_publish-npm.yaml` has no smoke test here, and cannot have one.** Its
+`dry-run` input runs everything through `npm publish --dry-run`, which uploads
+nothing — but `package.json` in this repository is `private: true`, and npm
+refuses to publish a private package even as a dry run. Canary it in
+`unplugin-style-dictionary` with the recipe below, which is what `dry-run`
+exists to make safe.
+
+What none of this covers is the application-token path, or anything that only
 happens on a real push to a default branch. For a change touching those, canary
 it by hand as well:
 
@@ -159,6 +180,31 @@ copying it to a job-level `env` first and testing `env.X != ''`, which is what
 **A skipped step's outputs are empty strings, not null.** That is load-bearing:
 `steps.app-token.outputs.token || github.token` is the whole token fallback. It
 works precisely because the skipped step yields `''`.
+
+**A `./` reference inside a reusable workflow does not mean what it means in an
+ordinary one.** In `lint.yaml`, `./actions/setup-node` resolves against this
+repository and is the documented way to reference a sibling action. Inside a
+workflow called through `workflow_call`, the same string resolves against the
+checkout sitting in the workspace — and that checkout belongs to the _caller_,
+so it would look for the action in the consuming repository and not find it.
+GitHub documents `./` for referencing a workflow in the same repository and says
+nothing either way about an action referenced from inside a called workflow.
+That is why `_publish-npm.yaml` inlines `actions/setup-node@v7.0.0` and its
+`npm ci` rather than calling the composite next door. Do not "de-duplicate" it.
+
+Naming the composite by tag is the other obvious fix and is worse: it pins this
+repository to a version of itself that does not exist until the release carrying
+the change is cut.
+
+**`_publish-npm.yaml` declares `permissions` and `_release-please.yaml` does
+not, and the difference is not an inconsistency.** A called workflow may always
+request less than its caller granted; requesting more fails the run. So a block
+is safe exactly when every caller needs the same scopes. Publishing callers all
+need `contents: read` and `id-token: write`, so naming them turns a forgotten
+scope into an immediate error instead of an npm-side refusal. Release callers do
+not agree with each other — one supplying an application token leaves
+`GITHUB_TOKEN` on `contents: read`, one falling back needs three write scopes —
+so any block there would break one kind.
 
 **Hyphens are fine in `uses:` refs and property names.** `steps.app-token`,
 `inputs.auto-merge` and `secrets.private-key` all parse as property access, not

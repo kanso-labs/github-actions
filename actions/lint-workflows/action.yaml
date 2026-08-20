@@ -1,0 +1,33 @@
+name: Lint workflows
+description:
+  Runs actionlint over a repository's workflows, checking expression syntax,
+  action inputs, permission scopes and the shell of every run block.
+
+inputs:
+  version:
+    # renovate: datasource=github-releases depName=rhysd/actionlint
+    default: 1.7.12
+    description:
+      actionlint release to run. Pinned rather than tracking latest, because an
+      unpinned linter turns its next new rule into a red build on whichever pull
+      request happens to be open at the time, which tells that author nothing
+      about their own work. Renovate bumps this.
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # Checking out is the caller's job, the same way it is for setup-node.
+    # actionlint reads .github/workflows from the working directory, so there
+    # has to be one already.
+    #
+    # A repository silences a rule by committing .github/actionlint.yaml, which
+    # actionlint discovers on its own — so no input here exposes it. That file
+    # is also how a stale built-in list gets worked around: actionlint carries
+    # its own copy of the valid permission scopes, and a scope GitHub has added
+    # since the pinned release is reported as unknown until the bump lands.
+    - name: Run actionlint
+      uses: raven-actions/actionlint@v2.2.0
+      with:
+        fail-on-error: true
+        version: ${{ inputs.version }}
