@@ -1,5 +1,17 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "datasourceTemplate": "{{{datasource}}}",
+      "description": "Tool versions pinned as a composite action input default, annotated above the default",
+      "extractVersionTemplate": "^v(?<version>.*)$",
+      "managerFilePatterns": ["/^actions/.+/action\\.yaml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+default: (?<currentValue>\\S+)"
+      ]
+    }
+  ],
   "extends": ["config:recommended"],
   "minimumReleaseAge": null,
   "packageRules": [
@@ -12,6 +24,9 @@
   "prHourlyLimit": 0,
   "rebaseWhen": "behind-base-branch",
   "recreateWhen": "always",
+  "semanticCommitScope": null,
+  "semanticCommitType": "deps",
+  "semanticCommits": "enabled",
   "vulnerabilityAlerts": {
     "enabled": false
   }

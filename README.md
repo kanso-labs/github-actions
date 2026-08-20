@@ -11,7 +11,9 @@ them to consume these. A private consumer would need
 
 | Thing                                                                | Kind              | Solves                                                                  |
 | -------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------- |
+| [`actions/lint-workflows`](actions/lint-workflows)                   | Composite action  | Running actionlint, pinned, in every repository that has workflows      |
 | [`actions/setup-node`](actions/setup-node)                           | Composite action  | The Node setup preamble repeated in every Node CI job                   |
+| [`_publish-npm.yaml`](.github/workflows/_publish-npm.yaml)           | Reusable workflow | Publishing a package over trusted publishing, after a release is cut    |
 | [`_release-please.yaml`](.github/workflows/_release-please.yaml)     | Reusable workflow | Proposing releases, with a token whose pull requests run CI             |
 | [`_renovate-command.yaml`](.github/workflows/_renovate-command.yaml) | Reusable workflow | Answering `@renovate rebase` on a pull request, the way Dependabot does |
 
@@ -53,6 +55,117 @@ Reads the Node version from `.tool-versions`, restores the npm cache, and runs
 The npm cache comes from `actions/setup-node`'s own `cache: npm`, which is why
 consumers do not need a separate `actions/cache` step for `~/.npm`. Any such
 step left behind is doing nothing.
+
+## `actions/lint-workflows`
+
+Runs actionlint over `.github/workflows`, at a pinned version. Full inputs are
+in [its README](actions/lint-workflows/README.md).
+
+Put it in the job a ruleset already requires rather than in a job of its own. A
+new job means a new check name, and a check name nothing requires can fail
+without stopping anything — so a workflow linter added that way reports problems
+to no one.
+
+A repository silences a rule by committing `.github/actionlint.yaml`, which
+actionlint discovers by itself. That file is also the escape hatch for
+actionlint being stale: it carries its own copy of the valid permission scopes,
+so a scope GitHub has added since the pinned release reads as an error on a
+workflow that is perfectly correct. `kanso-ui` needs exactly that for
+`code-quality`, which `actions/upload-code-coverage` requires.
+
+## `_publish-npm.yaml`
+
+Publishes a package to npm after `_release-please.yaml` has cut a release. It
+checks out, installs, builds, and publishes — the four steps `kanso-ui` and
+`unplugin-style-dictionary` each had their own copy of.
+
+```yaml
+publish:
+  name: Publish to npm
+  needs: release-please
+  if: needs.release-please.outputs.release_created == 'true'
+  permissions:
+    contents: read
+    id-token: write
+  uses: kanso-labs/github-actions/.github/workflows/_publish-npm.yaml@v2.1.0
+```
+
+Compare `release_created` against the string. A bare truthiness test also passes
+on `"false"`, which is what that output carries when release-please runs and
+decides not to cut a release — so the package would be published on every merge.
+
+### There is no token
+
+Publishing goes over npm trusted publishing, so the caller passes no secrets at
+all. `id-token: write` is what npm exchanges for a short-lived credential, and
+it is what mints the provenance attestation alongside it.
+
+Unlike `_release-please.yaml`, this workflow does declare its `permissions`,
+because here they do not vary: every caller publishes the same way and needs the
+same two scopes. A caller that forgets `id-token` then fails immediately with a
+message naming the scope, rather than reaching npm and being refused there for a
+reason that reads as an npm problem.
+
+**The first publish of a package cannot use this.** npm configures a trusted
+publisher on the package page, and the package has to exist before there is a
+page to configure, so a new package is pushed by hand once and this takes over
+afterwards. Both packages in this organization were bootstrapped that way.
+
+### `ignore-scripts` defaults to true here
+
+The composite action defaults it to `false` and this defaults it to `true`,
+which is worth explaining rather than lining up.
+
+`npm` runs `prepare` on publish as well as on install. A repository whose
+`prepare` downloads Playwright's browsers therefore pays for that download twice
+in this job — once installing, once as a step of the publish itself, where
+failing to fetch a browser aborts a release that has already been tagged.
+Nothing either package ships is produced by a lifecycle script; the build step
+is the whole of it.
+
+Set it to `false` only for a package with a native dependency to compile.
+
+### Inputs
+
+| Input               | Default                      | Description                                     |
+| ------------------- | ---------------------------- | ----------------------------------------------- |
+| `build-script`      | `build`                      | npm script producing what is published          |
+| `dry-run`           | `false`                      | Publish with `--dry-run`, uploading nothing     |
+| `ignore-scripts`    | `true`                       | Pass `--ignore-scripts` to `npm ci` and publish |
+| `node-version-file` | `.tool-versions`             | File the Node version is read from              |
+| `registry-url`      | `https://registry.npmjs.org` | Registry to publish to                          |
+
+Pass `build-script: ''` for a package with nothing to build; the step is then
+skipped rather than running `npm run` with an empty argument.
+
+### It inlines the Node setup rather than calling `actions/setup-node`
+
+Deliberately, and it is the one duplication here that should stay.
+
+A `./` reference inside a reusable workflow resolves against the checkout in the
+workspace, and that checkout belongs to the caller — so it would look for the
+composite in the consuming repository and not find it. GitHub documents `./` for
+referencing a workflow in the same repository and says nothing either way about
+an action referenced from inside a called workflow, which is not a thing to rest
+on when every consumer publishes through here.
+
+Naming the composite by tag would work and introduces a worse problem: it pins
+this repository to a version of itself that does not exist until the release
+carrying the change is cut.
+
+What inlining gives up is the cache handling, and this job turns that off
+regardless — it installs once and throws the runner away, so restoring the cache
+costs more than the single install it would save.
+
+### Verifying a change to it
+
+`dry-run` runs everything including `npm publish --dry-run`, which resolves the
+manifest and prints the file list without uploading. It cannot be exercised in
+this repository: `package.json` here is `private: true`, and npm refuses to
+publish — even a dry run — for a private package.
+
+Canary it in `unplugin-style-dictionary` instead, following the recipe in
+[`AGENTS.md`](AGENTS.md).
 
 ## `_release-please.yaml`
 
@@ -254,7 +367,24 @@ requests are squash-merged, that title is the only commit that reaches `main`:
 | ------------- | ------------- |
 | `feat`        | Minor release |
 | `fix`         | Patch release |
+| `deps`        | Patch release |
 | anything else | No release    |
+
+`deps` is not a Conventional Commits type. It exists because Renovate's default
+type is `chore(deps)`, and `chore` is hidden in release-please's defaults —
+release-please decides there are no user-facing commits and opens no release
+pull request at all. So a run of nothing but dependency upgrades released
+nothing, and an upgrade shipped only when a feature happened to land beside it.
+
+Consumers pin exact tags, so an upgrade that cuts no release is one nobody can
+pin. `.github/renovate.json` therefore sets `semanticCommitType: deps`, and
+`release-please-config.json` gives that type a visible **Dependencies** section.
+The section list there replaces release-please's defaults wholesale rather than
+extending them, so dropping `feat` or `fix` from it would silently stop those
+releases too.
+
+A plain `chore:` still publishes nothing, which is the point: housekeeping
+should not cut a release.
 
 A release that changes how a consumer must call something is a breaking change,
 and it needs `!` so the major moves. Consumers pin exact versions, so nothing

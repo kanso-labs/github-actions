@@ -1,0 +1,130 @@
+name: Publish to npm
+
+on:
+  workflow_call:
+    inputs:
+      build-script:
+        default: build
+        description:
+          npm script that produces what gets published. Pass an empty string for
+          a package with nothing to build.
+        required: false
+        type: string
+      dry-run:
+        default: false
+        description:
+          Run everything up to and including npm publish --dry-run, which
+          resolves the manifest and prints the file list without uploading
+          anything. Exists so a caller can exercise this workflow on a pull
+          request. Not something a publishing caller should set.
+        required: false
+        type: boolean
+      ignore-scripts:
+        default: true
+        description:
+          Whether to pass --ignore-scripts to npm ci and to npm publish. True by
+          default, which is the opposite of the composite action's default and
+          deliberate — see README.md.
+        required: false
+        type: boolean
+      node-version-file:
+        default: .tool-versions
+        description: File the Node version is read from.
+        required: false
+        type: string
+      registry-url:
+        default: https://registry.npmjs.org
+        description: Registry to publish to, written to a job-level .npmrc.
+        required: false
+        type: string
+
+# Declared here rather than left to the caller, which is the opposite of what
+# _release-please.yaml does and for a reason worth keeping straight. There the
+# needed scopes genuinely differ between callers, so naming any of them would
+# break one kind. Here they do not: every caller publishes over trusted
+# publishing, so every caller needs exactly these two. Naming them means a
+# caller that forgets id-token fails immediately, with a message saying which
+# scope is missing, rather than reaching npm and being refused there for a
+# reason that reads as an npm problem.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      # Deliberately not actions/setup-node from this repository, even though
+      # these two steps are most of what it does.
+      #
+      # A local "./" reference inside a reusable workflow is resolved against
+      # the checkout in the workspace, which belongs to the caller — so it would
+      # look for the composite in the consuming repository and not find it.
+      # GitHub documents "./" for referencing a workflow in the same repository
+      # and says nothing either way about an action referenced from inside a
+      # called workflow, and this is not a thing to rest on undocumented
+      # behaviour: every consumer publishes through here.
+      #
+      # Naming the composite by tag instead — setup-node@v2.1.0 — would work,
+      # but it pins this repository to a version of itself that does not exist
+      # until the release that carries this file is cut, and silently publishes
+      # the wrong thing if release-please ever computes a different number.
+      #
+      # What is lost by inlining is the cache handling, and this job turns that
+      # off anyway: it installs once and throws the runner away, so restoring
+      # the cache costs more than the one install it saves.
+      - name: Set up Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          package-manager-cache: false
+          node-version-file: ${{ inputs.node-version-file }}
+          registry-url: ${{ inputs.registry-url }}
+
+      # npm ci takes the flag but not a value for it, so the two forms cannot be
+      # collapsed into one interpolated command line.
+      - name: Install dependencies
+        env:
+          IGNORE_SCRIPTS: ${{ inputs.ignore-scripts }}
+        run: |
+          if [[ "${IGNORE_SCRIPTS}" == 'true' ]]; then
+            npm ci --ignore-scripts
+          else
+            npm ci
+          fi
+
+      - name: Run build
+        if: inputs.build-script != ''
+        env:
+          BUILD_SCRIPT: ${{ inputs.build-script }}
+        run: npm run "${BUILD_SCRIPT}"
+
+      # --ignore-scripts here is a different question from the one above, and
+      # the answer happens to be the same. npm runs prepare on publish as well
+      # as on install, so a package whose prepare script downloads a browser
+      # would pay for it a second time here — as a step of the publish itself,
+      # where failing to fetch something aborts a release that has already been
+      # tagged. The build above is what produces the published files.
+      #
+      # Collected into an array rather than interpolated, because npm takes both
+      # of these as flags and neither accepts a value.
+      - name: Publish to npm
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+          IGNORE_SCRIPTS: ${{ inputs.ignore-scripts }}
+        run: |
+          set -euo pipefail
+
+          args=()
+          if [[ "${IGNORE_SCRIPTS}" == 'true' ]]; then
+            args+=(--ignore-scripts)
+          fi
+          if [[ "${DRY_RUN}" == 'true' ]]; then
+            args+=(--dry-run)
+          fi
+
+          npm publish "${args[@]}"

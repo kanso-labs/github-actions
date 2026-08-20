@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  # release-please only ever reacts to a push, which leaves no way to ask it to
+  # look again. That matters when a release pull request has to be discarded:
+  # release-please rewrites one only when the release it computes changes, so a
+  # pull request that cannot merge is not repaired by closing it, and nothing
+  # proposes a replacement until somebody happens to push. This is that lever.
+  workflow_dispatch:
 
 # Every release merge pushes main, and every push starts a run. Several merges
 # landing inside a minute start overlapping runs that try to cut the same tags
@@ -29,11 +35,12 @@ jobs:
   # pull request opened with that token starts no runs and so can never report
   # the checks it now has to pass.
   #
-  # Pinned to v1.3.0 rather than to the version this branch will become. A
-  # caller cannot name a tag that does not exist yet, and v1.3.0 is the first
-  # release that takes client-id, so moving the pin here is what lets the secret
-  # name move now rather than after the release. Renovate raises the major
-  # afterwards, and by then this already passes what v2 requires.
+  # The pin below is whatever Renovate last bumped it to, never the version
+  # this branch is about to become — a caller cannot name a tag that does not
+  # exist yet. So a freshly cut release is not what proposes the next one, and
+  # this repository always runs one release behind itself. Leave that: it is the
+  # same lag every consumer has, and this is the only place it is visible from
+  # the inside.
   release-please:
     name: Propose releases
     # Referenced by tag rather than by path, so this repository exercises the
