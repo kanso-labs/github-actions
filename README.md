@@ -11,7 +11,6 @@ them to consume these. A private consumer would need
 
 | Thing                                                                | Kind              | Solves                                                                     |
 | -------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------- |
-| [`actions/check-shared-docs`](actions/check-shared-docs)             | Composite action  | Keeping the AGENTS.md paragraphs every repository duplicates from drifting |
 | [`actions/lint-workflows`](actions/lint-workflows)                   | Composite action  | Running actionlint, pinned, in every repository that has workflows         |
 | [`actions/setup-node`](actions/setup-node)                           | Composite action  | The Node setup preamble repeated in every Node CI job                      |
 | [`_publish-npm.yaml`](.github/workflows/_publish-npm.yaml)           | Reusable workflow | Publishing a package to npm and to GitHub Packages, after a release is cut |
@@ -73,29 +72,6 @@ actionlint being stale: it carries its own copy of the valid permission scopes,
 so a scope GitHub has added since the pinned release reads as an error on a
 workflow that is perfectly correct. `kanso-ui` needs exactly that for
 `code-quality`, which `actions/upload-code-coverage` requires.
-
-## `actions/check-shared-docs`
-
-Compares the shared `AGENTS.md` blocks a repository marks against the canonical
-copies held here, and fails with a diff when they disagree. Full details are in
-[its README](actions/check-shared-docs/README.md).
-
-Every `kanso-labs` `AGENTS.md` writes the shared conventions out in full so that
-an agent handed one repository alone still gets them, and that duplication is
-deliberate. What it costs is drift: the copies were retyped rather than copied,
-so no two matched, and a paragraph nothing can diff is one where a wrong fact in
-one copy stays invisible from the others. One roster paragraph was wrong about
-two different repositories on the same day.
-
-A repository opts in per block by wrapping its copy in `<!-- shared:name -->`
-and `<!-- /shared:name -->`, which render as nothing. The markers earn their
-place twice over: the check reads them, and so does whoever is about to edit the
-paragraph.
-
-Put it in the job a ruleset already requires rather than in a job of its own,
-for the same reason as the workflow linter — a check name nothing requires can
-fail without stopping anything, and a drift guard that does not guard is worse
-than none.
 
 ## `_publish-npm.yaml`
 
