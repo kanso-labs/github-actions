@@ -455,6 +455,7 @@ requests are squash-merged, that title is the only commit that reaches `main`:
 | `feat`        | Minor release |
 | `fix`         | Patch release |
 | `deps`        | Patch release |
+| `ci`          | Patch release |
 | anything else | No release    |
 
 `deps` is not a Conventional Commits type. It exists because Renovate's default
@@ -469,6 +470,19 @@ pin. `.github/renovate.json` therefore sets `semanticCommitType: deps`, and
 The section list there replaces release-please's defaults wholesale rather than
 extending them, so dropping `feat` or `fix` from it would silently stop those
 releases too.
+
+`ci` is a Conventional Commits type, and it is visible here for the same reason
+`deps` is. The workflows and composite actions in this repository are the thing
+consumers pin, so a `ci:` commit is usually a change to the product rather than
+to the scaffolding around it — and hidden, it shipped only when something else
+happened to release beside it.
+
+The type is coarser than the distinction it is standing in for. This
+repository's own `lint.yaml`, `test.yaml` and `release-please.yaml` are consumed
+by nobody, so a `ci:` change to one of them now cuts a release that says nothing
+to any consumer. release-please keys on the commit type and not the path, so
+that is the cost of the type being visible at all. Reach for `chore:` when a
+change genuinely touches only this repository's own scaffolding.
 
 A plain `chore:` still publishes nothing, which is the point: housekeeping
 should not cut a release.
