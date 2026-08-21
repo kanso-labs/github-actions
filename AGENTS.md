@@ -69,8 +69,8 @@ time, in a pull request, rather than all four the moment it merges. Do not
 release-please owns `version.txt` and `.release-please-manifest.json`. Nobody
 edits either by hand. Pull requests are squash-merged, so the pull request title
 is the only commit that reaches `main` and the single input to the release:
-`feat` for a minor, `fix` and `deps` for a patch, `!` for a breaking change,
-anything else releases nothing.
+`feat` for a minor, `fix`, `deps` and `ci` for a patch, `!` for a breaking
+change, anything else releases nothing.
 
 `deps` is not a Conventional Commits type, and it is here because Renovate's
 default `chore(deps)` is hidden in release-please's defaults — which makes
@@ -82,6 +82,26 @@ pin. `.github/renovate.json` sets `semanticCommitType: deps` in a `packageRule`
 `release-please-config.json` gives it a visible **Dependencies** section. That
 section list supersedes release-please's defaults rather than extending them, so
 a type dropped from it becomes invisible rather than merely unstyled.
+
+`ci` is visible for a related reason. The workflows and composite actions here
+are the thing consumers pin, so a `ci:` commit is usually a change to the
+product rather than to the scaffolding around it, and hidden it shipped only
+when something else happened to release beside it.
+
+The type is coarser than the distinction it stands for, and that costs
+something. `lint.yaml`, `test.yaml` and `release-please.yaml` are consumed by
+nobody, so a `ci:` change to one of them cuts a release that says nothing to any
+consumer — release-please keys on the commit type, never on the path. Use
+`chore:` when a change really does touch only this repository's own scaffolding.
+
+**Making a hidden type visible is safe only while no Renovate-managed file names
+this repository.** A releasable type plus a self-reference is the release loop
+described in Traps: Renovate bumps the reference, the bump releases, the release
+moves what Renovate reads. Both halves have to be present, so check the first
+before adding to the second. Renovate's `github-actions` manager reads
+`.github/workflows/*.yaml` and `action.yaml`, and no markdown — the `uses:`
+examples in the README files are documentation and are not bumped, which is why
+they sit on four different old versions.
 
 **Breaking means "a consumer must edit something to keep working"** — removing
 an input, renaming an output, changing a default. Exact pins mean nothing breaks

@@ -18,6 +18,10 @@
       "type": "deps"
     },
     {
+      "section": "Continuous Integration",
+      "type": "ci"
+    },
+    {
       "section": "Reverts",
       "type": "revert"
     },
@@ -50,11 +54,6 @@
       "hidden": true,
       "section": "Build System",
       "type": "build"
-    },
-    {
-      "hidden": true,
-      "section": "Continuous Integration",
-      "type": "ci"
     }
   ],
   "packages": {
