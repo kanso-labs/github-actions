@@ -36,6 +36,8 @@ for what CI does and does not cover.
 
 Shared with the other `kanso-labs` repositories:
 
+<!-- shared:conventions -->
+
 - **Keys in JSON and YAML are ordered by name.** Files whose order carries
   meaning are exempt: workflows, where step order is execution order;
   changelogs, which are chronological; and `package.json`, where the npm
@@ -56,9 +58,19 @@ Shared with the other `kanso-labs` repositories:
 - **`.tool-versions` pins a fully-specified version on every line**,
   `nodejs 24.19.0`, never `nodejs 24` or `nodejs lts`.
 
+<!-- /shared:conventions -->
+
 That last one has more reach from here than it does anywhere else:
 `actions/setup-node` defaults `node-version-file` to `.tool-versions`, here and
 in every consumer, so that file is what a run actually resolves.
+
+**That list is inside `<!-- shared:conventions -->` markers, and editing it here
+alone fails `Check formatting`.** `actions/check-shared-docs` compares it
+against `actions/check-shared-docs/blocks/conventions.md`, which is the
+canonical copy every repository marking the block is checked against. Change the
+block first, then the copies, in the same round — the markers exist so that the
+person about to edit the paragraph finds that out before pushing rather than
+after.
 
 Formatting is not shared, and assuming it is will send you to a command that
 does not exist. **Prettier formats the YAML, JSON and Markdown here**, and CI
@@ -129,13 +141,19 @@ CI resolves; if `node --version` disagrees, prefix the command:
 `mise exec node@24.19.0 -- npm ci`. An older npm rewrites the lockfile as it
 installs, dropping platform entries a Linux runner needs.
 
-**Both composite actions have a live smoke test**, in
+**All three composite actions have a live smoke test**, in
 [`lint.yaml`](.github/workflows/lint.yaml): `check-formatting` calls
-`./actions/setup-node` and `lint-workflows` calls `./actions/lint-workflows`, so
-a change that breaks either fails on the pull request rather than in whichever
-repository next bumps its pin. Those are the only jobs in this repository that
-exercise them — keep them that way round, and do not "tidy" either into a plain
-`actions/setup-node` or `raven-actions/actionlint` step.
+`./actions/setup-node` and `./actions/check-shared-docs`, and `lint-workflows`
+calls `./actions/lint-workflows`, so a change that breaks any of them fails on
+the pull request rather than in whichever repository next bumps its pin. Those
+are the only jobs in this repository that exercise them — keep them that way
+round, and do not "tidy" any of them into a plain `actions/setup-node`,
+`raven-actions/actionlint` or inline script step.
+
+`check-shared-docs` is a step of `check-formatting` rather than a job of its own
+because the ruleset requires that job by name. A new job would be a new check
+name nothing requires, free to fail without stopping anything — which for a
+drift guard means not guarding.
 
 A local `./` reference is safe there and is not safe inside a reusable workflow;
 see the trap below before copying the pattern into one.
