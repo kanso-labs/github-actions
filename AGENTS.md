@@ -77,10 +77,15 @@ time, in a pull request, rather than all four the moment it merges. Do not
 "simplify" a consumer to `@main`.
 
 release-please owns `version.txt` and `.release-please-manifest.json`. Nobody
-edits either by hand. Pull requests are squash-merged, so the pull request title
-is the only commit that reaches `main` and the single input to the release:
-`feat` for a minor, `fix`, `deps` and `ci` for a patch, `!` for a breaking
-change, anything else releases nothing.
+edits either by hand.
+
+Pull requests are squash-merged, with the pull request title as the commit
+subject and an empty body. That title becomes the only commit on `main`, and
+branch commit messages are discarded by the squash and never reach history.
+
+That title is therefore the single input to the release: `feat` for a minor,
+`fix`, `deps` and `ci` for a patch, `!` for a breaking change, anything else
+releases nothing.
 
 `deps` is not a Conventional Commits type, and it is here because Renovate's
 default `chore(deps)` is hidden in release-please's defaults — which makes
