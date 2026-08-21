@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.2](https://github.com/kanso-labs/github-actions/compare/v3.0.1...v3.0.2) (2026-08-21)
+
+
+### Continuous Integration
+
+* call release-please by path to stop the release loop ([#31](https://github.com/kanso-labs/github-actions/issues/31)) ([570442c](https://github.com/kanso-labs/github-actions/commit/570442c9e80c5da02c2f13aaa00235c534123511))
+* cut a release for ci-typed changes ([#32](https://github.com/kanso-labs/github-actions/issues/32)) ([80475e4](https://github.com/kanso-labs/github-actions/commit/80475e40bf7662f9726c25e8ca57f6133d7bf41e))
+
 ## [3.0.1](https://github.com/kanso-labs/github-actions/compare/v3.0.0...v3.0.1) (2026-08-21)
 
 
