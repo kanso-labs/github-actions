@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.0](https://github.com/kanso-labs/github-actions/compare/v3.0.2...v3.1.0) (2026-08-21)
+
+
+### Features
+
+* add actions/check-shared-docs to catch AGENTS.md drift ([#39](https://github.com/kanso-labs/github-actions/issues/39)) ([3a475f6](https://github.com/kanso-labs/github-actions/commit/3a475f605d513f249e103778a09e71c79a87c1af))
+
 ## [3.0.2](https://github.com/kanso-labs/github-actions/compare/v3.0.1...v3.0.2) (2026-08-21)
 
 
