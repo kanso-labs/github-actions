@@ -56,10 +56,9 @@ does not exist. **Prettier formats the YAML, JSON and Markdown here**, and CI
 checks it — run `npm run format` before pushing. Elsewhere in the organization:
 `home-assistant-applications` also formats the same three with Prettier and
 checks it in CI, but has no `package.json` and so no `format` script — it runs
-`npx prettier --write .`; `kanso-ui` uses oxfmt (`npm run format`, checked
-inside `npm run lint`), `unplugin-style-dictionary` has no `format` script and
-runs Prettier only through `eslint-plugin-prettier` inside `npm run lint`, and
-`renovate` has no formatter at all.
+`npx prettier --write .`; `kanso-ui` and `unplugin-style-dictionary` both use
+oxfmt (`npm run format`, checked inside `npm run lint`), and `renovate` has no
+formatter at all.
 
 ## Versioning
 
