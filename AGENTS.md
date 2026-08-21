@@ -67,7 +67,8 @@ default `chore(deps)` is hidden in release-please's defaults — which makes
 release-please decide there are no user-facing commits and open no release pull
 request at all. A run of nothing but upgrades therefore released nothing, and
 consumers pin exact tags, so an upgrade that cuts no release is one nobody can
-pin. `.github/renovate.json` sets `semanticCommitType: deps` and
+pin. `.github/renovate.json` sets `semanticCommitType: deps` in a `packageRule`
+— see Traps for why it cannot be a top-level key — and
 `release-please-config.json` gives it a visible **Dependencies** section. That
 section list supersedes release-please's defaults rather than extending them, so
 a type dropped from it becomes invisible rather than merely unstyled.
@@ -140,6 +141,17 @@ request. Read what the run logged and check the reaction that landed on the
 comment, rather than its colour.
 
 ## Traps
+
+**`semanticCommitType` has to be a `packageRule`, not a top-level key.** It was
+top-level at first and did nothing at all: `config:recommended` extends
+`:semanticPrefixFixDepsChoreOthers`, which sets the type through `packageRules`
+— `matchPackageNames: ["*"] -> chore`, plus a narrower `dependencies -> fix` —
+and `packageRules` beat top-level config. So every upgrade kept the type the
+preset chose, and Renovate went on writing `chore:` while the setting sat there
+looking correct.
+
+The rule this repository carries is therefore first in `packageRules`, where a
+later rule can still override it for specific packages.
 
 **A called workflow cannot request more permissions than its caller granted.**
 Not a silent intersection — the run fails outright with a message naming the
