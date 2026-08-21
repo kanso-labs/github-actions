@@ -116,9 +116,10 @@ see the trap below before copying the pattern into one.
 release-please resolves the config, walks the commits and computes versions
 while opening no pull request and cutting no release. It passes no secrets, so
 it covers the `GITHUB_TOKEN` fallback and its warning as well. That path
-reference is deliberate and is the opposite of what `release-please.yaml` does:
-the test has to run the version in the pull request, which is the only version
-not yet released.
+reference is deliberate: the test has to run the version in the pull request,
+which is the only version not yet released. `release-please.yaml` reaches the
+same workflow the same way — see the trap below for why it stopped pinning a
+tag.
 
 **`_publish-npm.yaml` has no smoke test here, and cannot have one.** Its
 `dry-run` input runs both jobs through `npm publish --dry-run`, which uploads
@@ -279,7 +280,19 @@ subtraction. There is no need to rename anything to underscores.
 cannot be collapsed into one interpolated command line, which is why the
 composite action branches in shell instead of interpolating the flag.
 
-**This repository's own `release-please.yaml` pins a tag, not `./`.** So a
-freshly cut release is not what proposes the next one — Renovate has to bump the
-pin first. Leave it: it is the same lag consumers have, and it is the only place
-that lag is visible from the inside.
+**This repository's own `release-please.yaml` calls `./`, and pinning a tag
+there is a release loop.** It pinned one until v3.0.1, which made this
+repository a consumer of itself: Renovate bumps the pin, the bump lands as
+`deps` and so cuts a patch release, the release moves the tag, and the next
+Renovate run bumps it again — one release every three hours, each carrying
+nothing but the bump of the one before it. Any self-reference reintroduces that,
+so `./` here is the rule and not a shortcut.
+
+What the tag bought was exercising the call shape consumers use, and that is
+thinner than it sounds: `_release-please.yaml` references no sibling action or
+workflow, only external pinned ones, so nothing in it resolves differently
+between the two forms, and four consumers exercise the tag form continuously
+anyway. What went with it is the lag — `main` now runs `main`, so a bad merge to
+`_release-please.yaml` breaks releases here at once rather than waiting for a
+bump to carry it in. Push the fix and the next run has it, or dispatch
+`Release Please` by hand if nothing else is due to push.
