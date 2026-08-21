@@ -4,3 +4,9 @@ node_modules/
 # git records them as gitlinks rather than files, and one `git add -A` is enough
 # to commit a pointer to a commit that exists only on somebody's laptop.
 .claude/worktrees/
+
+# Agent scratch space (pull request body drafts). Ignored here rather than only
+# in a personal global gitignore, because Prettier reads .gitignore and not
+# core.excludesfile — so `npm run lint`, which is `prettier --check .`, would
+# otherwise fail on drafts this repository does not own.
+.context/
