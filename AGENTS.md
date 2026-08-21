@@ -20,6 +20,18 @@ Nothing here is used by one repository alone. A change that looks obviously
 right in the shape one caller uses it can still be wrong for another, so check
 every caller before changing an input's meaning or a default.
 
+## Commands
+
+| Task           | Command          | Notes                                           |
+| -------------- | ---------------- | ----------------------------------------------- |
+| Lint           | `npm run lint`   | Prettier check over the YAML, JSON and Markdown |
+| Format         | `npm run format` | Prettier write; run it before pushing           |
+| Lint workflows | `actionlint`     | Also runs as a step of `Lint` in CI             |
+
+There is no `SessionStart` hook here, so `npm ci` is yours to run before
+`npm run lint`. Neither command type-checks anything — see Verifying a change
+for what CI does and does not cover.
+
 ## Conventions
 
 Shared with the other `kanso-labs` repositories:
@@ -221,10 +233,10 @@ v1.0.2 of this repository were released that way.
 
 **The concurrency guard lives in the caller, and that is deliberate.** Do not
 move it into `_release-please.yaml` to save the repetition. GitHub documents
-`concurrency` at the caller and says nothing about a group declared in a called
-workflow, so moving it there would bet a guard that only matters during a rare
-race on undocumented behaviour — and if it turned out to be a no-op, all three
-consumers would lose it silently and simultaneously.
+`concurrency` at the caller and says nothing either way about a group declared
+in a called workflow, so moving it there would bet a guard that only matters
+during a rare race on undocumented behaviour — and if it turned out to be a
+no-op, all three consumers would lose it silently and simultaneously.
 
 **The `secrets` context is not available to an `if:` condition.** Not at job
 level and not at step level. Checking whether a secret was supplied means
