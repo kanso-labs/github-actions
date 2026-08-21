@@ -10,18 +10,15 @@ underscore. [`README.md`](README.md) documents what each one does and how to
 call it — read it first, and keep it correct when you change behaviour, because
 it is what consumers read.
 
-Consumers today:
-
-| Repository                                                                               | Uses                                                                                                                  |
-| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| [home-assistant-applications](https://github.com/kanso-labs/home-assistant-applications) | `_release-please.yaml`                                                                                                |
-| [kanso-ui](https://github.com/kanso-labs/kanso-ui)                                       | `_publish-npm.yaml`, `_release-please.yaml`, `_renovate-command.yaml`, `actions/lint-workflows`, `actions/setup-node` |
-| [renovate](https://github.com/kanso-labs/renovate)                                       | `_renovate-command.yaml`                                                                                              |
-| [unplugin-style-dictionary](https://github.com/kanso-labs/unplugin-style-dictionary)     | `_publish-npm.yaml`, `_release-please.yaml`, `_renovate-command.yaml`, `actions/lint-workflows`, `actions/setup-node` |
+**This file does not name the consumers, deliberately.** Which repository calls
+what is a fact the caller owns and changes without telling anyone here, so a
+roster in this file is stale the moment one adds or drops a call. Read it from
+the calling side instead — the `uses:` lines under a consumer's
+`.github/workflows/`, which is also the only place the pinned tag is visible.
 
 Nothing here is used by one repository alone. A change that looks obviously
-right in the shape one consumer calls it can still be wrong for the other two,
-so check all of them before changing an input's meaning or a default.
+right in the shape one caller uses it can still be wrong for another, so check
+every caller before changing an input's meaning or a default.
 
 ## Conventions
 
@@ -53,12 +50,10 @@ in every consumer, so that file is what a run actually resolves.
 
 Formatting is not shared, and assuming it is will send you to a command that
 does not exist. **Prettier formats the YAML, JSON and Markdown here**, and CI
-checks it — run `npm run format` before pushing. Elsewhere in the organization:
-`home-assistant-applications` also formats the same three with Prettier and
-checks it in CI, but has no `package.json` and so no `format` script — it runs
-`npx prettier --write .`; `kanso-ui` and `unplugin-style-dictionary` both use
-oxfmt (`npm run format`, checked inside `npm run lint`), and `renovate` has no
-formatter at all.
+checks it — run `npm run format` before pushing. The siblings do not agree with
+each other or with this repository, and a roster of what each one runs belongs
+in each one rather than here. Read the Commands section of whichever repository
+you are actually in before reaching for a formatting command.
 
 ## Versioning
 
@@ -147,17 +142,16 @@ tag.
 **`_publish-npm.yaml` has no smoke test here, and cannot have one.** Its
 `dry-run` input runs both jobs through `npm publish --dry-run`, which uploads
 nothing — but `package.json` in this repository is `private: true`, and npm
-refuses to publish a private package even as a dry run. Canary it in
-`unplugin-style-dictionary` with the recipe below, which is what `dry-run`
-exists to make safe.
+refuses to publish a private package even as a dry run. Canary it in a consumer
+with the recipe below, which is what `dry-run` exists to make safe.
 
-**A canary in `unplugin-style-dictionary` does not exercise the whole of it.**
-That repository has no `@kanso-labs` dependency, so its `npm ci` cannot hit the
-scoped-registry trap below no matter which registry the job points at.
-`kanso-ui` is the only repository that can, and it is also the one with
-Playwright — so a change to how `Publish to GitHub Packages` installs is the
-case where canarying in the smaller repository proves the least. Read the trap
-and reason about it rather than trusting a green run there.
+**The smallest consumer does not exercise the whole of it.** A caller with no
+`@kanso-labs` dependency cannot reach the scoped-registry trap below, whatever
+registry the job points at — only one that installs another `kanso-labs` package
+can, and that is also the heaviest install. So a change to how
+`Publish to GitHub Packages` installs is exactly the case where canarying in the
+smallest consumer proves the least. Read the trap and reason about it rather
+than trusting a green run there.
 
 What none of this covers is the application-token path, or anything that only
 happens on a real push to a default branch. For a change touching those, canary
@@ -168,13 +162,13 @@ it by hand as well:
 3. Merge nothing — dispatch or push the consumer branch and read the run.
 4. Delete both branches, then merge the real pull request.
 
-Do this in `unplugin-style-dictionary` rather than
-`home-assistant-applications`: it has one package, no application token, and
-nothing installed depends on its releases.
+Pick the consumer with one package, no application token, and nothing installed
+depending on its releases. A bad canary run then costs a throwaway branch rather
+than somebody's release.
 
-`_renovate-command` canaries in `renovate`, its only consumer and the one place
-an open Renovate pull request is always available to comment on. Two things
-about it differ from the recipe above:
+`_renovate-command` has to be canaried wherever an open Renovate pull request is
+always available to comment on. Two things about it differ from the recipe
+above:
 
 **The caller cannot be canaried from a branch.** `issue_comment` is a
 repository-level event, so GitHub runs whatever version of the workflow file is
@@ -281,13 +275,12 @@ key, so a matrix would hand every leg the union.
 `actions/setup-node` writes a _scoped_ line for that registry —
 `@kanso-labs:registry=https://npm.pkg.github.com/` — because it serves one scope
 only, and npm reads that line when resolving dependencies as much as when
-publishing. `kanso-ui` devDepends on `@kanso-labs/unplugin-style-dictionary`, so
-an `npm ci` under that config goes looking for a version GitHub Packages does
-not have, 404s, and half-lands the release. That is why
-`Publish to GitHub Packages` sets up Node against the _public_ registry,
-installs and builds, and only then calls `actions/setup-node` a second time to
-repoint npm. Do not "simplify" it to one setup step with the GitHub Packages
-URL.
+publishing. A consumer that depends on another `@kanso-labs` package therefore
+runs an `npm ci` that goes looking for a version GitHub Packages does not have,
+404s, and half-lands the release. That is why `Publish to GitHub Packages` sets
+up Node against the _public_ registry, installs and builds, and only then calls
+`actions/setup-node` a second time to repoint npm. Do not "simplify" it to one
+setup step with the GitHub Packages URL.
 
 The second call is safe to make because the action appends: it drops only lines
 starting with the registry key it is about to write, and the scoped key does not
