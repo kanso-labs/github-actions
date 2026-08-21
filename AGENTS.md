@@ -38,6 +38,16 @@ Shared with the other `kanso-labs` repositories:
   and matrix keys are exempt.
 - **Actions are pinned to exact release tags**, `actions/checkout@v7.0.1`, never
   a moving major or `@main`. Renovate opens the bump pull requests.
+- **Dependency versions are pinned exactly**, the same rule one layer down.
+  Every `dependencies`, `devDependencies`, and `optionalDependencies` entry is a
+  bare version, `3.9.6`, never `^3.9.6`, `~3.9.6`, `>=3.9.6`, `*`, `3.x`, or an
+  `||` union. Renovate opens those bumps too. `peerDependencies` are the
+  deliberate exception: they state what the consumer's own installed copy must
+  satisfy, so ranges are correct there and stay.
+- **`.tool-versions` pins a fully-specified version on every line**,
+  `nodejs 24.19.0`, never `nodejs 24` or `nodejs lts`. `actions/setup-node`
+  defaults `node-version-file` to it, here and in every consumer, so that file
+  is what a run actually resolves.
 
 Formatting is not shared, and assuming it is will send you to a command that
 does not exist. **Prettier formats the YAML, JSON and Markdown here**, and CI
@@ -82,6 +92,12 @@ the changelog, so the major is the only warning that arrives with the change.
 
 `npm run lint` and actionlint cover syntax. Neither proves a workflow does what
 it claims — most of what has gone wrong in CI here was valid YAML.
+
+There is no `SessionStart` hook here, so `npm ci` is yours to run before
+`npm run lint`. Run it under the Node version in `.tool-versions`, which is what
+CI resolves; if `node --version` disagrees, prefix the command:
+`mise exec node@24.19.0 -- npm ci`. An older npm rewrites the lockfile as it
+installs, dropping platform entries a Linux runner needs.
 
 **Both composite actions have a live smoke test**, in
 [`lint.yaml`](.github/workflows/lint.yaml): `check-formatting` calls
