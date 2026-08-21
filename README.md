@@ -478,7 +478,9 @@ and it needs `!` so the major moves. Consumers pin exact versions, so nothing
 breaks the moment it is released — but a Renovate bump landing on a repository
 that never read the changelog is the same failure a day later.
 
-This repository's own `release-please.yaml` pins a tag rather than referencing
-`./`, so it runs exactly what consumers run. Renovate bumps that pin like any
-other, which means the workflow lags one Renovate cycle behind its own latest
-release. That is deliberate: it is the same lag every consumer has.
+This repository's own `release-please.yaml` references `./` rather than pinning
+a tag, which is the one place the advice above is inverted. A pin makes the
+repository a consumer of itself: Renovate bumps it, the bump cuts a patch
+release as any `deps` change does, the release moves the tag, and the next
+Renovate run bumps it again — forever. Consumers have no such cycle, because a
+release of this repository does not move any tag they pin.
