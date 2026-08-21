@@ -27,9 +27,15 @@ jobs:
       - name: Run actionlint
         uses: ./actions/lint-workflows
 
-  # This job is also the smoke test for actions/setup-node. It is the only
-  # place in this repository that runs it, and a change breaking the action
-  # fails here rather than in whichever repository next pins a new version.
+  # This job is also the smoke test for actions/setup-node and for
+  # actions/check-shared-docs. It is the only place in this repository that runs
+  # either, and a change breaking one fails here rather than in whichever
+  # repository next pins a new version.
+  #
+  # check-shared-docs is a step of this job rather than a job of its own on
+  # purpose. The ruleset requires this job by name; a new job would be a new
+  # check name that nothing requires, free to fail without stopping anything —
+  # which would make a drift guard that does not guard.
   check-formatting:
     name: Check formatting
     runs-on: ubuntu-latest
@@ -42,3 +48,6 @@ jobs:
 
       - name: Check formatting
         run: npm run lint
+
+      - name: Check shared documentation blocks
+        uses: ./actions/check-shared-docs
