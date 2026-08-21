@@ -70,8 +70,8 @@ A repository silences a rule by committing `.github/actionlint.yaml`, which
 actionlint discovers by itself. That file is also the escape hatch for
 actionlint being stale: it carries its own copy of the valid permission scopes,
 so a scope GitHub has added since the pinned release reads as an error on a
-workflow that is perfectly correct. `kanso-ui` needs exactly that for
-`code-quality`, which `actions/upload-code-coverage` requires.
+workflow that is perfectly correct. A consumer uploading code coverage needs
+exactly that for `code-quality`, which `actions/upload-code-coverage` requires.
 
 ## `_publish-npm.yaml`
 
@@ -174,10 +174,10 @@ _public_ registry, which reads like a copy-paste slip. It is not one.
 Handed a GitHub Packages URL, `actions/setup-node` writes a **scoped** registry
 line — `@kanso-labs:registry=https://npm.pkg.github.com/` — because that
 registry serves exactly one scope. That line governs installs as much as
-publishes, and `kanso-ui` devDepends on `@kanso-labs/unplugin-style-dictionary`,
-pinned to a version that predates this job. Its `npm ci` would go looking for
-that version on a registry that will never carry it, 404, and half-land the
-release: tagged, on npm, missing from the mirror.
+publishes. A consumer that devDepends on another `@kanso-labs` package, pinned
+to a version that predates this job, would therefore run an `npm ci` that goes
+looking for that version on a registry that will never carry it, 404, and
+half-land the release: tagged, on npm, missing from the mirror.
 
 So that job installs and builds against the public registry, then calls
 `actions/setup-node` a second time to repoint npm once nothing is left to
@@ -261,10 +261,10 @@ resolves the manifest and prints the file list without uploading. It cannot be
 exercised in this repository: `package.json` here is `private: true`, and npm
 refuses to publish — even a dry run — for a private package.
 
-Canary it in `unplugin-style-dictionary` instead, following the recipe in
-[`AGENTS.md`](AGENTS.md). That repository has no `@kanso-labs` dependency of its
-own, so a canary there will not exercise the scoped-registry trap above —
-`kanso-ui` is the only repository that can.
+Canary it in a consumer instead, following the recipe in
+[`AGENTS.md`](AGENTS.md). Pick carefully: a consumer with no `@kanso-labs`
+dependency of its own will not exercise the scoped-registry trap above, and only
+one that installs another `kanso-labs` package can.
 
 ## `_release-please.yaml`
 
@@ -303,9 +303,8 @@ leaves the merge to them.
 
 A repository whose ruleset requires status checks cannot really use the fallback
 at all: the release pull request never starts the checks it is required to pass,
-so nobody without bypass can merge it. `kanso-ui` and
-`unplugin-style-dictionary` are both in that position, which is the real reason
-they need the app installed rather than a stylistic one.
+so nobody without bypass can merge it. That is the real reason such a consumer
+needs the application installed, rather than a stylistic one.
 
 **Auto-merge on the release pull requests.** Enabled by default; pass
 `auto-merge: false` to turn it off. Note that `--auto` only queues when
