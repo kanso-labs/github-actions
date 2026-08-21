@@ -38,24 +38,28 @@ Shared with the other `kanso-labs` repositories:
   and matrix keys are exempt.
 - **Actions are pinned to exact release tags**, `actions/checkout@v7.0.1`, never
   a moving major or `@main`. Renovate opens the bump pull requests.
-- **Dependency versions are pinned exactly**, the same rule one layer down.
-  Every `dependencies`, `devDependencies`, and `optionalDependencies` entry is a
-  bare version, `3.9.6`, never `^3.9.6`, `~3.9.6`, `>=3.9.6`, `*`, `3.x`, or an
-  `||` union. Renovate opens those bumps too. `peerDependencies` are the
-  deliberate exception: they state what the consumer's own installed copy must
-  satisfy, so ranges are correct there and stay.
+- **Dependency versions are pinned exactly.** Every `dependencies`,
+  `devDependencies`, and `optionalDependencies` entry is a bare version,
+  `1.2.3`, never `^1.2.3`, `~1.2.3`, `>=1.2.3`, `*`, `1.x`, or an `||` union.
+  Renovate opens those bumps too. `peerDependencies` are the deliberate
+  exception: they state what the consumer's own installed copy must satisfy, so
+  ranges are correct there and stay.
 - **`.tool-versions` pins a fully-specified version on every line**,
-  `nodejs 24.19.0`, never `nodejs 24` or `nodejs lts`. `actions/setup-node`
-  defaults `node-version-file` to it, here and in every consumer, so that file
-  is what a run actually resolves.
+  `nodejs 24.19.0`, never `nodejs 24` or `nodejs lts`.
+
+That last one has more reach from here than it does anywhere else:
+`actions/setup-node` defaults `node-version-file` to `.tool-versions`, here and
+in every consumer, so that file is what a run actually resolves.
 
 Formatting is not shared, and assuming it is will send you to a command that
 does not exist. **Prettier formats the YAML, JSON and Markdown here**, and CI
 checks it — run `npm run format` before pushing. Elsewhere in the organization:
-`home-assistant-applications` matches this, `kanso-ui` uses oxfmt
-(`npm run format`, checked inside `npm run lint`), `unplugin-style-dictionary`
-has no `format` script and runs Prettier only through `eslint-plugin-prettier`
-inside `npm run lint`, and `renovate` has no formatter at all.
+`home-assistant-applications` also formats the same three with Prettier and
+checks it in CI, but has no `package.json` and so no `format` script — it runs
+`npx prettier --write .`; `kanso-ui` uses oxfmt (`npm run format`, checked
+inside `npm run lint`), `unplugin-style-dictionary` has no `format` script and
+runs Prettier only through `eslint-plugin-prettier` inside `npm run lint`, and
+`renovate` has no formatter at all.
 
 ## Versioning
 
@@ -187,13 +191,13 @@ comment, rather than its colour.
 
 ## Traps
 
-**`semanticCommitType` has to be a `packageRule`, not a top-level key.** It was
-top-level at first and did nothing at all: `config:recommended` extends
-`:semanticPrefixFixDepsChoreOthers`, which sets the type through `packageRules`
-— `matchPackageNames: ["*"] -> chore`, plus a narrower `dependencies -> fix` —
-and `packageRules` beat top-level config. So every upgrade kept the type the
-preset chose, and Renovate went on writing `chore:` while the setting sat there
-looking correct.
+**`semanticCommitType` sits in a `packageRule`, and that is the whole fix.** It
+was a top-level key at first and did nothing at all. `config:recommended`
+extends `:semanticPrefixFixDepsChoreOthers`, which sets the type through
+`packageRules` — `matchPackageNames: ["*"]` to `chore`, plus a narrower
+`dependencies` to `fix` — and `packageRules` beat top-level config. So Renovate
+went on writing `chore:` while the setting sat there looking correct, and only
+production dependencies released at all.
 
 The rule this repository carries is therefore first in `packageRules`, where a
 later rule can still override it for specific packages.
