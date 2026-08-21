@@ -19,6 +19,14 @@ on:
           request. Not something a publishing caller should set.
         required: false
         type: boolean
+      github-registry-url:
+        default: https://npm.pkg.github.com
+        description:
+          GitHub Packages registry the mirror job publishes to. Only the host is
+          configurable — the scope is always the calling repository's owner,
+          because that is the only scope this registry accepts.
+        required: false
+        type: string
       ignore-scripts:
         default: true
         description:
@@ -34,25 +42,35 @@ on:
         type: string
       registry-url:
         default: https://registry.npmjs.org
-        description: Registry to publish to, written to a job-level .npmrc.
+        description:
+          Public registry the first job publishes to, written to a job-level
+          .npmrc. Both jobs also install from it.
         required: false
         type: string
 
-# Declared here rather than left to the caller, which is the opposite of what
-# _release-please.yaml does and for a reason worth keeping straight. There the
-# needed scopes genuinely differ between callers, so naming any of them would
-# break one kind. Here they do not: every caller publishes over trusted
-# publishing, so every caller needs exactly these two. Naming them means a
-# caller that forgets id-token fails immediately, with a message saying which
-# scope is missing, rather than reaching npm and being refused there for a
-# reason that reads as an npm problem.
-permissions:
-  contents: read
-  id-token: write
+# Permissions are declared per job below rather than once for the file, and that
+# is not tidiness — the two jobs must not hold each other's scope.
+#
+# npm decides whether to attempt an OIDC exchange by looking for the variables
+# that id-token: write injects. GitHub Packages has no trusted publishing to
+# exchange against, so granting that scope to the mirror job would invite npm to
+# try something the registry cannot answer, during the publish half of a release
+# that has already been tagged. It is granted where it is used and nowhere else.
+#
+# The fail-fast property the old file-level block bought is unchanged. A caller
+# is checked against every job it starts, so one that forgets a scope still
+# fails immediately with that scope named, rather than reaching a registry and
+# being refused there for a reason that reads as a registry problem.
 
 jobs:
+  # The public registry, over trusted publishing, and the source of truth for
+  # what a version of this package is. The mirror below runs after it, and only
+  # if it succeeded — see the comment there.
   publish:
     name: Publish to npm
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -116,6 +134,127 @@ jobs:
         env:
           DRY_RUN: ${{ inputs.dry-run }}
           IGNORE_SCRIPTS: ${{ inputs.ignore-scripts }}
+        run: |
+          set -euo pipefail
+
+          args=()
+          if [[ "${IGNORE_SCRIPTS}" == 'true' ]]; then
+            args+=(--ignore-scripts)
+          fi
+          if [[ "${DRY_RUN}" == 'true' ]]; then
+            args+=(--dry-run)
+          fi
+
+          npm publish "${args[@]}"
+
+  # The same tarball, pushed to GitHub Packages so the organization's own
+  # registry carries every version the public one does.
+  #
+  # It repeats four steps rather than reusing the job above, because the two
+  # differ in the one place that cannot be parameterised: their permissions. A
+  # matrix would collapse the duplication and hand both legs the union of the
+  # scopes, which is the thing the block above refuses to do. A second runner is
+  # cheaper than that.
+  #
+  # needs: publish orders them, and the ordering is the point rather than a side
+  # effect. npm is the source of truth; this is the mirror. If the public
+  # publish fails, both registries stay one version behind, and the next release
+  # — or re-running this job on its own — catches them up together. Without the
+  # edge, a failed npm publish would leave GitHub Packages serving a version
+  # npmjs.com has never heard of, which is the one state a version number cannot
+  # be reasoned about from.
+  publish-github-packages:
+    name: Publish to GitHub Packages
+    needs: publish
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      # Points at the public registry and not at GitHub Packages, which is the
+      # trap this job is built around rather than an oversight.
+      #
+      # Given a GitHub Packages registry-url, actions/setup-node writes a scoped
+      # line — @kanso-labs:registry=https://npm.pkg.github.com/ — because that
+      # registry serves one scope only. The line governs installs as much as
+      # publishes, so npm ci below would go looking for every @kanso-labs
+      # dependency there. kanso-ui has one: it devDepends on
+      # @kanso-labs/unplugin-style-dictionary, pinned to a version that predates
+      # this job and that GitHub Packages will therefore never carry. The
+      # install would 404 and the release would half-land.
+      #
+      # So: install and build against the same registry the job above uses, and
+      # repoint npm afterwards, once there is nothing left to resolve.
+      - name: Set up Node
+        uses: actions/setup-node@v7.0.0
+        with:
+          package-manager-cache: false
+          node-version-file: ${{ inputs.node-version-file }}
+          registry-url: ${{ inputs.registry-url }}
+
+      - name: Install dependencies
+        env:
+          IGNORE_SCRIPTS: ${{ inputs.ignore-scripts }}
+        run: |
+          if [[ "${IGNORE_SCRIPTS}" == 'true' ]]; then
+            npm ci --ignore-scripts
+          else
+            npm ci
+          fi
+
+      - name: Run build
+        if: inputs.build-script != ''
+        env:
+          BUILD_SCRIPT: ${{ inputs.build-script }}
+        run: npm run "${BUILD_SCRIPT}"
+
+      # Calling actions/setup-node a second time is how the .npmrc gets
+      # rewritten, rather than appending to that file by hand. Writing it is the
+      # action's job, and reaching for NPM_CONFIG_USERCONFIG to find where it
+      # put the file would rest on an internal of the action.
+      #
+      # It appends rather than replaces. The action drops only those lines
+      # starting with the registry key it is about to write, and here that key
+      # is scoped — @kanso-labs:registry — which the unscoped registry= line
+      # from the first call does not match. So both survive: registry= still
+      # names the public one, and only this single scope is redirected.
+      #
+      # Which also means NODE_AUTH_TOKEN below is substituted into the auth line
+      # of both registries. Publishing a scoped package only ever contacts the
+      # registry for that scope, so the token is not in fact sent to npmjs.com —
+      # and it is a run-scoped token either way.
+      #
+      # scope is stated rather than left to default. The action does default it
+      # to the repository owner for a npm.pkg.github.com URL, and inside a
+      # called workflow the github context belongs to the caller, so the default
+      # would land on this same value. Saying it costs one line and means a
+      # publish's correctness does not turn on which repository a context is
+      # read from.
+      - name: Point npm at GitHub Packages
+        uses: actions/setup-node@v7.0.0
+        with:
+          package-manager-cache: false
+          node-version-file: ${{ inputs.node-version-file }}
+          registry-url: ${{ inputs.github-registry-url }}
+          scope: ${{ github.repository_owner }}
+
+      # NODE_AUTH_TOKEN belongs to this step rather than to the job, so it
+      # exists for exactly the request that needs it. GitHub Packages has no
+      # trusted publishing: GITHUB_TOKEN plus packages: write is the whole of
+      # the authentication, and it expires with the run.
+      #
+      # Nothing attested comes out of here. Provenance is minted during the OIDC
+      # exchange, which is the job above's business — this is the same tarball,
+      # attested in the place where attestation is possible.
+      - name: Publish to GitHub Packages
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+          IGNORE_SCRIPTS: ${{ inputs.ignore-scripts }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 

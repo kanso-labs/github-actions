@@ -121,11 +121,19 @@ the test has to run the version in the pull request, which is the only version
 not yet released.
 
 **`_publish-npm.yaml` has no smoke test here, and cannot have one.** Its
-`dry-run` input runs everything through `npm publish --dry-run`, which uploads
+`dry-run` input runs both jobs through `npm publish --dry-run`, which uploads
 nothing — but `package.json` in this repository is `private: true`, and npm
 refuses to publish a private package even as a dry run. Canary it in
 `unplugin-style-dictionary` with the recipe below, which is what `dry-run`
 exists to make safe.
+
+**A canary in `unplugin-style-dictionary` does not exercise the whole of it.**
+That repository has no `@kanso-labs` dependency, so its `npm ci` cannot hit the
+scoped-registry trap below no matter which registry the job points at.
+`kanso-ui` is the only repository that can, and it is also the one with
+Playwright — so a change to how `Publish to GitHub Packages` installs is the
+case where canarying in the smaller repository proves the least. Read the trap
+and reason about it rather than trusting a green run there.
 
 What none of this covers is the application-token path, or anything that only
 happens on a real push to a default branch. For a change touching those, canary
@@ -228,11 +236,40 @@ the change is cut.
 not, and the difference is not an inconsistency.** A called workflow may always
 request less than its caller granted; requesting more fails the run. So a block
 is safe exactly when every caller needs the same scopes. Publishing callers all
-need `contents: read` and `id-token: write`, so naming them turns a forgotten
-scope into an immediate error instead of an npm-side refusal. Release callers do
-not agree with each other — one supplying an application token leaves
-`GITHUB_TOKEN` on `contents: read`, one falling back needs three write scopes —
-so any block there would break one kind.
+need the same three, so naming them turns a forgotten scope into an immediate
+error instead of a registry-side refusal. Release callers do not agree with each
+other — one supplying an application token leaves `GITHUB_TOKEN` on
+`contents: read`, one falling back needs three write scopes — so any block there
+would break one kind.
+
+**`_publish-npm.yaml` declares those `permissions` per job rather than once for
+the file, and that is not tidiness either.** `Publish to npm` holds
+`id-token: write` and `Publish to GitHub Packages` holds `packages: write`, and
+neither holds the other's. npm decides whether to attempt an OIDC exchange by
+looking for the variables `id-token: write` injects; GitHub Packages has no
+trusted publisher to exchange against. Granting both scopes to both jobs would
+invite npm to try something that registry cannot answer, in the publish half of
+a release that has already been tagged. Do not hoist the block back up to the
+file, and do not collapse the two jobs into a matrix — `permissions` is a job
+key, so a matrix would hand every leg the union.
+
+**A GitHub Packages `registry-url` redirects installs, not just publishes.**
+`actions/setup-node` writes a _scoped_ line for that registry —
+`@kanso-labs:registry=https://npm.pkg.github.com/` — because it serves one scope
+only, and npm reads that line when resolving dependencies as much as when
+publishing. `kanso-ui` devDepends on `@kanso-labs/unplugin-style-dictionary`, so
+an `npm ci` under that config goes looking for a version GitHub Packages does
+not have, 404s, and half-lands the release. That is why
+`Publish to GitHub Packages` sets up Node against the _public_ registry,
+installs and builds, and only then calls `actions/setup-node` a second time to
+repoint npm. Do not "simplify" it to one setup step with the GitHub Packages
+URL.
+
+The second call is safe to make because the action appends: it drops only lines
+starting with the registry key it is about to write, and the scoped key does not
+match the unscoped `registry=` line the first call left. Writing the line by
+hand instead would mean locating the file through `NPM_CONFIG_USERCONFIG`, which
+is an internal of the action rather than a documented interface.
 
 **Hyphens are fine in `uses:` refs and property names.** `steps.app-token`,
 `inputs.auto-merge` and `secrets.private-key` all parse as property access, not
