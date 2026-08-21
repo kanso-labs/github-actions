@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/kanso-labs/github-actions/compare/v2.1.0...v3.0.0) (2026-08-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* publish to GitHub Packages alongside npm ([#27](https://github.com/kanso-labs/github-actions/issues/27))
+
+### Features
+
+* publish to GitHub Packages alongside npm ([#27](https://github.com/kanso-labs/github-actions/issues/27)) ([bdb4fdd](https://github.com/kanso-labs/github-actions/commit/bdb4fdd01af2c5d70f272a1806da846aa05cfb7d))
+
 ## [2.1.0](https://github.com/kanso-labs/github-actions/compare/v2.0.0...v2.1.0) (2026-08-20)
 
 
