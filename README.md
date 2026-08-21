@@ -137,22 +137,34 @@ than being refused by a registry for a reason that reads as a registry problem.
 a trusted publisher on the package page, and the package has to exist before
 there is a page to configure, so a new package is pushed by hand once and this
 takes over afterwards. Both packages in this organization were bootstrapped that
-way. GitHub Packages needs no equivalent — `GITHUB_TOKEN` creates the package on
-first publish — but see the next section before assuming it is reachable.
+way. GitHub Packages needs no equivalent: `GITHUB_TOKEN` creates the package on
+first publish, and it arrives public.
 
-### A new package on GitHub Packages starts out private
+### A new package on GitHub Packages arrives public, with nothing to flip
 
-GitHub Packages creates a new package private, and keeps its visibility as a
-setting of the package rather than something inherited from the repository that
-published it. `publishConfig.access` is `public` on both packages in this
-organization, which is what npm's `--access` reads, and it is worth not assuming
-that settles it on this registry.
+Worth stating because the opposite is widely reported, and this section said it
+too until the first two releases proved otherwise.
 
-So after the first release that reaches a new package there, open the package
-under the organization's **Packages** tab and check. Flipping it to public is a
-one-time manual step and does not come back — a public package cannot be made
-private again. Until it is flipped the version is published and simply not
-installable without a token, and nothing in the run reports that.
+Both packages were created by their first release through this workflow and both
+came out `visibility=public` immediately, with no manual step:
+
+```
+$ gh api "/orgs/kanso-labs/packages?package_type=npm"
+  unplugin-style-dictionary  visibility=public
+  kanso-ui                   visibility=public
+```
+
+What makes that so is not isolated here, so do not over-generalize it. These are
+public repositories, the packages are scoped to the organization that owns them,
+and `publishConfig.access` is `public` in both manifests — which is what npm's
+`--access` reads. A private repository, or a manifest without that key, is a
+case this organization has no evidence about.
+
+The check is still worth a glance after the first release that creates a package
+somewhere new, because visibility is a package-level setting and nothing in the
+run reports it. It is under the organization's **Packages** tab. Making a
+package public is one-way if it ever does come out private — a public package
+cannot be made private again.
 
 ### The GitHub Packages job installs from npmjs.com, deliberately
 
