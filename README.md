@@ -9,13 +9,13 @@ them to consume these. A private consumer would need
 
 ## What is here
 
-| Thing                                                                | Kind              | Solves                                                                  |
-| -------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------- |
-| [`actions/lint-workflows`](actions/lint-workflows)                   | Composite action  | Running actionlint, pinned, in every repository that has workflows      |
-| [`actions/setup-node`](actions/setup-node)                           | Composite action  | The Node setup preamble repeated in every Node CI job                   |
-| [`_publish-npm.yaml`](.github/workflows/_publish-npm.yaml)           | Reusable workflow | Publishing a package over trusted publishing, after a release is cut    |
-| [`_release-please.yaml`](.github/workflows/_release-please.yaml)     | Reusable workflow | Proposing releases, with a token whose pull requests run CI             |
-| [`_renovate-command.yaml`](.github/workflows/_renovate-command.yaml) | Reusable workflow | Answering `@renovate rebase` on a pull request, the way Dependabot does |
+| Thing                                                                | Kind              | Solves                                                                     |
+| -------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------- |
+| [`actions/lint-workflows`](actions/lint-workflows)                   | Composite action  | Running actionlint, pinned, in every repository that has workflows         |
+| [`actions/setup-node`](actions/setup-node)                           | Composite action  | The Node setup preamble repeated in every Node CI job                      |
+| [`_publish-npm.yaml`](.github/workflows/_publish-npm.yaml)           | Reusable workflow | Publishing a package to npm and to GitHub Packages, after a release is cut |
+| [`_release-please.yaml`](.github/workflows/_release-please.yaml)     | Reusable workflow | Proposing releases, with a token whose pull requests run CI                |
+| [`_renovate-command.yaml`](.github/workflows/_renovate-command.yaml) | Reusable workflow | Answering `@renovate rebase` on a pull request, the way Dependabot does    |
 
 ## Consuming them
 
@@ -75,9 +75,8 @@ workflow that is perfectly correct. `kanso-ui` needs exactly that for
 
 ## `_publish-npm.yaml`
 
-Publishes a package to npm after `_release-please.yaml` has cut a release. It
-checks out, installs, builds, and publishes — the four steps `kanso-ui` and
-`unplugin-style-dictionary` each had their own copy of.
+Publishes a package once `_release-please.yaml` has cut a release — to npmjs.com
+over trusted publishing, then to GitHub Packages. One call does both.
 
 ```yaml
 publish:
@@ -87,29 +86,110 @@ publish:
   permissions:
     contents: read
     id-token: write
-  uses: kanso-labs/github-actions/.github/workflows/_publish-npm.yaml@v2.1.0
+    packages: write
+  uses: kanso-labs/github-actions/.github/workflows/_publish-npm.yaml@v3.0.0
 ```
 
 Compare `release_created` against the string. A bare truthiness test also passes
 on `"false"`, which is what that output carries when release-please runs and
 decides not to cut a release — so the package would be published on every merge.
 
-### There is no token
+### Two registries, two jobs, one order
 
-Publishing goes over npm trusted publishing, so the caller passes no secrets at
-all. `id-token: write` is what npm exchanges for a short-lived credential, and
-it is what mints the provenance attestation alongside it.
+`Publish to npm` runs first and `Publish to GitHub Packages` `needs:` it.
 
-Unlike `_release-please.yaml`, this workflow does declare its `permissions`,
-because here they do not vary: every caller publishes the same way and needs the
-same two scopes. A caller that forgets `id-token` then fails immediately with a
-message naming the scope, rather than reaching npm and being refused there for a
-reason that reads as an npm problem.
+npmjs.com is the source of truth for what a version of a package is; GitHub
+Packages carries a copy. The edge between the jobs is what keeps the copy from
+getting ahead of the original: if the public publish fails, both registries stay
+a version behind, and the next release — or a re-run of the failed job on its
+own — catches them up together. Drop the edge and a failed `npm publish` leaves
+GitHub Packages serving a version npmjs.com has never heard of, which is the one
+state a version number cannot be reasoned about from.
 
-**The first publish of a package cannot use this.** npm configures a trusted
-publisher on the package page, and the package has to exist before there is a
-page to configure, so a new package is pushed by hand once and this takes over
-afterwards. Both packages in this organization were bootstrapped that way.
+The second job repeats the checkout, install and build rather than sharing the
+first job's. The two differ in the single thing a job cannot parameterise — its
+permissions — and the next section is why that difference has to be kept.
+
+### The two halves authenticate differently
+
+npmjs.com goes over trusted publishing, so no secret is passed for it at all.
+`id-token: write` is what npm exchanges for a short-lived credential, and what
+mints the provenance attestation alongside it.
+
+GitHub Packages has no trusted publishing. It takes `GITHUB_TOKEN` with
+`packages: write`, set as `NODE_AUTH_TOKEN` on the publish step alone rather
+than on the job. Nothing attested comes out of that half: provenance is minted
+during the OIDC exchange, so the tarball is attested at npmjs.com and only
+mirrored here.
+
+Each job declares its own scope and neither holds the other's, which is
+load-bearing rather than tidy. npm decides whether to attempt an OIDC exchange
+by looking for the variables `id-token: write` injects, and GitHub Packages has
+no trusted publisher to exchange against — so a file-level block granting both
+scopes would invite npm to try something that registry cannot answer, in the
+publish half of a release that has already been tagged.
+
+The caller grants all three together. It is checked against each job separately,
+so a scope left out still fails the run at once with that scope named, rather
+than being refused by a registry for a reason that reads as a registry problem.
+
+**The first publish of a package to npmjs.com cannot use this.** npm configures
+a trusted publisher on the package page, and the package has to exist before
+there is a page to configure, so a new package is pushed by hand once and this
+takes over afterwards. Both packages in this organization were bootstrapped that
+way. GitHub Packages needs no equivalent — `GITHUB_TOKEN` creates the package on
+first publish — but see the next section before assuming it is reachable.
+
+### A new package on GitHub Packages starts out private
+
+GitHub Packages creates a new package private, and keeps its visibility as a
+setting of the package rather than something inherited from the repository that
+published it. `publishConfig.access` is `public` on both packages in this
+organization, which is what npm's `--access` reads, and it is worth not assuming
+that settles it on this registry.
+
+So after the first release that reaches a new package there, open the package
+under the organization's **Packages** tab and check. Flipping it to public is a
+one-time manual step and does not come back — a public package cannot be made
+private again. Until it is flipped the version is published and simply not
+installable without a token, and nothing in the run reports that.
+
+### The GitHub Packages job installs from npmjs.com, deliberately
+
+`Set up Node` in `Publish to GitHub Packages` names `registry-url` as the
+_public_ registry, which reads like a copy-paste slip. It is not one.
+
+Handed a GitHub Packages URL, `actions/setup-node` writes a **scoped** registry
+line — `@kanso-labs:registry=https://npm.pkg.github.com/` — because that
+registry serves exactly one scope. That line governs installs as much as
+publishes, and `kanso-ui` devDepends on `@kanso-labs/unplugin-style-dictionary`,
+pinned to a version that predates this job. Its `npm ci` would go looking for
+that version on a registry that will never carry it, 404, and half-land the
+release: tagged, on npm, missing from the mirror.
+
+So that job installs and builds against the public registry, then calls
+`actions/setup-node` a second time to repoint npm once nothing is left to
+resolve. The second call appends rather than replaces — the action drops only
+lines beginning with the registry key it is about to write, and a scoped key
+does not match the unscoped `registry=` line already in the file.
+
+Writing that `.npmrc` line by hand instead would mean finding the file through
+`NPM_CONFIG_USERCONFIG`, which is an internal of the action. Calling the action
+twice asks the thing that owns the file to rewrite it.
+
+### Adopting the GitHub Packages half takes two merges, not one
+
+A caller granting fewer scopes than a called job requests fails the run
+outright. So `packages: write` has to be on the caller **before** its pin moves
+to a version of this repository that has the second job, not in the same change:
+
+1. Merge `packages: write` into the consumer's publish job. Harmless while the
+   pin is still on `v2.x` — a caller may grant more than a called workflow asks
+   for, and the unused scope goes nowhere.
+2. Let Renovate bump the pin. That merge is what turns the second job on.
+
+Doing it the other way round breaks the publish half of whatever release lands
+first.
 
 ### `ignore-scripts` defaults to true here
 
@@ -118,7 +198,7 @@ which is worth explaining rather than lining up.
 
 `npm` runs `prepare` on publish as well as on install. A repository whose
 `prepare` downloads Playwright's browsers therefore pays for that download twice
-in this job — once installing, once as a step of the publish itself, where
+in each job — once installing, once as a step of the publish itself, where
 failing to fetch a browser aborts a release that has already been tagged.
 Nothing either package ships is produced by a lifecycle script; the build step
 is the whole of it.
@@ -127,16 +207,21 @@ Set it to `false` only for a package with a native dependency to compile.
 
 ### Inputs
 
-| Input               | Default                      | Description                                     |
-| ------------------- | ---------------------------- | ----------------------------------------------- |
-| `build-script`      | `build`                      | npm script producing what is published          |
-| `dry-run`           | `false`                      | Publish with `--dry-run`, uploading nothing     |
-| `ignore-scripts`    | `true`                       | Pass `--ignore-scripts` to `npm ci` and publish |
-| `node-version-file` | `.tool-versions`             | File the Node version is read from              |
-| `registry-url`      | `https://registry.npmjs.org` | Registry to publish to                          |
+| Input                 | Default                      | Description                                          |
+| --------------------- | ---------------------------- | ---------------------------------------------------- |
+| `build-script`        | `build`                      | npm script producing what is published               |
+| `dry-run`             | `false`                      | Publish with `--dry-run`, uploading nothing          |
+| `github-registry-url` | `https://npm.pkg.github.com` | GitHub Packages registry the second job publishes to |
+| `ignore-scripts`      | `true`                       | Pass `--ignore-scripts` to `npm ci` and publish      |
+| `node-version-file`   | `.tool-versions`             | File the Node version is read from                   |
+| `registry-url`        | `https://registry.npmjs.org` | Public registry to publish to, and to install from   |
 
 Pass `build-script: ''` for a package with nothing to build; the step is then
 skipped rather than running `npm run` with an empty argument.
+
+There is no input for the GitHub Packages **scope**. That registry accepts only
+the owning organization's, so it is always `github.repository_owner` — which,
+inside a called workflow, is the caller's owner and not this repository's.
 
 ### It inlines the Node setup rather than calling `actions/setup-node`
 
@@ -153,19 +238,21 @@ Naming the composite by tag would work and introduces a worse problem: it pins
 this repository to a version of itself that does not exist until the release
 carrying the change is cut.
 
-What inlining gives up is the cache handling, and this job turns that off
-regardless — it installs once and throws the runner away, so restoring the cache
-costs more than the single install it would save.
+What inlining gives up is the cache handling, and both jobs turn that off
+regardless — each installs once and throws the runner away, so restoring the
+cache costs more than the single install it would save.
 
 ### Verifying a change to it
 
-`dry-run` runs everything including `npm publish --dry-run`, which resolves the
-manifest and prints the file list without uploading. It cannot be exercised in
-this repository: `package.json` here is `private: true`, and npm refuses to
-publish — even a dry run — for a private package.
+`dry-run` runs everything including `npm publish --dry-run`, in both jobs, which
+resolves the manifest and prints the file list without uploading. It cannot be
+exercised in this repository: `package.json` here is `private: true`, and npm
+refuses to publish — even a dry run — for a private package.
 
 Canary it in `unplugin-style-dictionary` instead, following the recipe in
-[`AGENTS.md`](AGENTS.md).
+[`AGENTS.md`](AGENTS.md). That repository has no `@kanso-labs` dependency of its
+own, so a canary there will not exercise the scoped-registry trap above —
+`kanso-ui` is the only repository that can.
 
 ## `_release-please.yaml`
 
