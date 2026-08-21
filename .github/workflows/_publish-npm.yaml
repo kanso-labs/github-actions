@@ -182,10 +182,10 @@ jobs:
       # line — @kanso-labs:registry=https://npm.pkg.github.com/ — because that
       # registry serves one scope only. The line governs installs as much as
       # publishes, so npm ci below would go looking for every @kanso-labs
-      # dependency there. kanso-ui has one: it devDepends on
-      # @kanso-labs/unplugin-style-dictionary, pinned to a version that predates
-      # this job and that GitHub Packages will therefore never carry. The
-      # install would 404 and the release would half-land.
+      # dependency there. A consumer that devDepends on another @kanso-labs
+      # package — pinned to a version that predates this job, and that GitHub
+      # Packages will therefore never carry — would 404 on the install and
+      # half-land the release.
       #
       # So: install and build against the same registry the job above uses, and
       # repoint npm afterwards, once there is nothing left to resolve.
