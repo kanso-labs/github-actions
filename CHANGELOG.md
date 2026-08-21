@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.1](https://github.com/kanso-labs/github-actions/compare/v3.1.0...v3.1.1) (2026-08-21)
+
+
+### Reverts
+
+* remove actions/check-shared-docs ([#41](https://github.com/kanso-labs/github-actions/issues/41)) ([b8f61a5](https://github.com/kanso-labs/github-actions/commit/b8f61a5b3b8dfb65648acc1678a670ddd1d5e886))
+
 ## [3.1.0](https://github.com/kanso-labs/github-actions/compare/v3.0.2...v3.1.0) (2026-08-21)
 
 
