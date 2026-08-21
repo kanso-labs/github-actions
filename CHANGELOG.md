@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/kanso-labs/github-actions/compare/v3.0.0...v3.0.1) (2026-08-21)
+
+
+### Dependencies
+
+* update kanso-labs/github-actions action to v3 ([#29](https://github.com/kanso-labs/github-actions/issues/29)) ([cfb0aa7](https://github.com/kanso-labs/github-actions/commit/cfb0aa79d4c4e472d97b105ad3c19c87fccb5ee5))
+
 ## [3.0.0](https://github.com/kanso-labs/github-actions/compare/v2.1.0...v3.0.0) (2026-08-21)
 
 
