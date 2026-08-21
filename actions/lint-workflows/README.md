@@ -52,6 +52,5 @@ which is the case this file is for.
 
 Put it in the job that already gates merges rather than in a job of its own. A
 new job means a new check name, and a check name that no ruleset requires is
-advisory: it can fail without stopping anything. `kanso-ui` and
-`unplugin-style-dictionary` both run it as a step of `Lint`, which their
-rulesets require.
+advisory: it can fail without stopping anything. Run it as a step of a job the
+ruleset already requires.
