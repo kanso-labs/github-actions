@@ -150,8 +150,8 @@ came out `visibility=public` immediately, with no manual step:
 
 ```
 $ gh api "/orgs/kanso-labs/packages?package_type=npm"
-  unplugin-style-dictionary  visibility=public
-  kanso-ui                   visibility=public
+  <package>  visibility=public
+  <package>  visibility=public
 ```
 
 What makes that so is not isolated here, so do not over-generalize it. These are
