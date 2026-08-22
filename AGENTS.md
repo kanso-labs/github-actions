@@ -87,16 +87,26 @@ That title is therefore the single input to the release: `feat` for a minor,
 `fix`, `deps` and `ci` for a patch, `!` for a breaking change, anything else
 releases nothing.
 
-`deps` is not a Conventional Commits type, and it is here because Renovate's
-default `chore(deps)` is hidden in release-please's defaults — which makes
-release-please decide there are no user-facing commits and open no release pull
-request at all. A run of nothing but upgrades therefore released nothing, and
-consumers pin exact tags, so an upgrade that cuts no release is one nobody can
-pin. `.github/renovate.json` sets `semanticCommitType: deps` in a `packageRule`
-— see Traps for why it cannot be a top-level key — and
-`release-please-config.json` gives it a visible **Dependencies** section. That
-section list supersedes release-please's defaults rather than extending them, so
-a type dropped from it becomes invisible rather than merely unstyled.
+**Renovate commits are typed `deps:`, and that is what makes them release.**
+release-please computes a patch bump for any commit that is not a `feat` or a
+breaking change, but it only opens a release pull request when the notes it
+generates are non-empty — a run whose every commit falls in a hidden changelog
+section is skipped as "No user facing commits found". Renovate's default,
+`chore(deps):`, lands in exactly such a section, so an upgrade never cut a
+release of its own: it shipped only when a feature happened to land beside it,
+and a run of nothing but upgrades published nothing at all.
+
+`.github/renovate.json` therefore sets `semanticCommits: enabled` and
+`semanticCommitScope: null` at the top level, and `semanticCommitType: deps` in
+a `packageRule` rather than beside them. `release-please-config.json` spells out
+`changelog-sections` with `deps` visible under a `Dependencies` heading. The two
+move together: that list replaces release-please's defaults wholesale, so a type
+missing from it is invisible rather than merely unstyled, and `deps` with no
+matching section would put the upgrades back where they started.
+
+It matters more here than in a repository nothing consumes: consumers pin exact
+tags, so an upgrade that cuts no release is one nobody can pin. See Traps for
+why the type cannot be a top-level key.
 
 `ci` is visible for a related reason. The workflows and composite actions here
 are the thing consumers pin, so a `ci:` commit is usually a change to the
