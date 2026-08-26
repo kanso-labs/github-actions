@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.2](https://github.com/kanso-labs/github-actions/compare/v3.1.1...v3.1.2) (2026-08-26)
+
+
+### Dependencies
+
+* update node.js to v24.20.0 ([#48](https://github.com/kanso-labs/github-actions/issues/48)) ([df30101](https://github.com/kanso-labs/github-actions/commit/df30101dd9b8febe0316f1857d6952ca24fe38e6))
+
 ## [3.1.1](https://github.com/kanso-labs/github-actions/compare/v3.1.0...v3.1.1) (2026-08-21)
 
 
