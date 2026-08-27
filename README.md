@@ -311,6 +311,15 @@ needs the application installed, rather than a stylistic one.
 something is already blocking the pull request. With no required checks it
 merges on the spot.
 
+The step finds those pull requests by their `autorelease: pending` label rather
+than by reading the action's `prs` output, and that difference is what lets a
+caller batch its releases. `prs` carries only what the run created or updated:
+when the release release-please computes has not changed, it logs
+`remained the same`, drops that pull request, and then sets no `prs` output at
+all rather than an empty array. A run that merely re-confirms a release pull
+request already open therefore finds nothing there to merge, while the label is
+on it either way.
+
 ### Permissions
 
 The workflow deliberately declares no `permissions` block, because what the
@@ -340,6 +349,55 @@ lose it at once and nobody would learn that until the race happened. In the
 caller it is supported, it is visible in review, and forgetting it costs one
 repository instead of all of them.
 
+### Releasing once a day instead of once a merge
+
+By default every merge to the default branch ends up releasing: the push run
+opens or updates the release pull request and turns auto-merge on, so it merges
+as soon as its checks pass, and the next merge opens another one. To batch a day
+of merges into one release, keep the push trigger — it is what keeps the release
+pull request's changelog and version current, and what makes pending work
+visible all day — and turn auto-merge on only from a scheduled run:
+
+```yaml
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  release-please:
+    name: Propose releases
+    uses: kanso-labs/github-actions/.github/workflows/_release-please.yaml@v3.2.0
+    with:
+      auto-merge: ${{ github.event_name == 'schedule' }}
+    secrets:
+      client-id: ${{ secrets.RELEASE_PLEASE_CLIENT_ID }}
+      private-key: ${{ secrets.RELEASE_PLEASE_PRIVATE_KEY }}
+```
+
+Evaluate `github.event_name` in the caller rather than asking this workflow to
+infer it. The caller is where the event is unambiguous, and it leaves
+`auto-merge` a mechanical input that does what its name says instead of a
+release policy the shared workflow imposes on every consumer at once.
+
+`workflow_dispatch` proposes without merging under that expression, which is
+usually what you want: it is the lever for re-proposing a stuck release pull
+request, not a release-now button. To release before the next scheduled run,
+enable auto-merge on the pull request by hand.
+
+Two things about scheduled workflows are worth knowing before relying on one.
+GitHub queues them hardest on the hour and may start one several minutes late,
+which for a daily release costs nothing. And it disables a schedule outright
+after 60 days without repository activity — a silent stop to releasing is the
+shape that failure takes.
+
+This needs v3.2.0 or later. Before it, auto-merge read the `prs` output above,
+and a scheduled run that re-confirmed an unchanged release pull request merged
+nothing.
+
 ### `dry-run`
 
 Runs release-please without opening a pull request or cutting a release. It
@@ -350,8 +408,10 @@ releasing for real has no reason to set it.
 ### Outputs
 
 `release_created`, `releases_created`, `paths_released`, `prs`, `tag_name` and
-`version`, passed straight through from the action. A caller that publishes on
-release reads `release_created`:
+`version`, passed straight through from the action. `prs` is empty on any run
+that wrote no release pull request, a run that found one already correct
+included — read the auto-merge note above before building on it. A caller that
+publishes on release reads `release_created`:
 
 ```yaml
 publish:

@@ -246,6 +246,26 @@ something else, and until it happens the version in `version.txt` is one no
 consumer can pin, because the tag it names does not exist. Both v1.0.1 and
 v1.0.2 of this repository were released that way.
 
+**`prs` carries only what a run wrote, and the auto-merge step must not read
+it.** When release-please recomputes a release and gets the same answer it logs
+`remained the same`, drops that pull request from what it returns, and the
+action then sets no `prs` output at all rather than an empty array. That is the
+ordinary case for a caller that proposes on every push and merges on a schedule:
+the scheduled run finds yesterday's pull request already correct. Gating
+auto-merge on `prs` there merges nothing, ever, and leaves no failing run to say
+so. The step looks the pull requests up by their `autorelease: pending` label
+instead — do not "simplify" it back to the output sitting directly above it.
+
+That lookup passes `--state open`, which the trap above is the reason for: a
+merged release pull request keeps the `autorelease: pending` label until a later
+run tags it, so filtering by label alone would turn up one with nothing left to
+merge.
+
+`!inputs.dry-run` became load-bearing at the same time. It used to be backed up
+by `prs` being empty whenever the pull request was skipped; a label lookup finds
+the standing release pull request either way, so that condition is now the only
+thing keeping a dry run from merging a real release.
+
 **The concurrency guard lives in the caller, and that is deliberate.** Do not
 move it into `_release-please.yaml` to save the repetition. GitHub documents
 `concurrency` at the caller and says nothing either way about a group declared

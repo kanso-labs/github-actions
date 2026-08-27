@@ -6,8 +6,10 @@ on:
       auto-merge:
         default: true
         description:
-          Whether to enable auto-merge on the release pull requests this run
-          opens or updates.
+          Whether to enable auto-merge on the release pull requests that are
+          open at the end of this run, whether or not this run is what opened
+          them. A caller that batches its releases passes true only on the run
+          that is meant to merge.
         required: false
         type: boolean
       dry-run:
@@ -135,23 +137,37 @@ jobs:
       # pull request itself is already open and correct, and merging it by hand
       # still works, so this warns and moves on.
       #
-      # The dry-run test cannot reach this anyway, since skipping the pull
-      # request leaves prs empty, but it is named in the condition regardless.
-      # A step that merges things should say when it does not run rather than
-      # rely on another output happening to be empty.
-      - name: Enable auto-merge on the release pull requests
-        if:
-          inputs.auto-merge && !inputs.dry-run && env.CLIENT_ID != '' &&
-          steps.release.outputs.prs != '' && steps.release.outputs.prs != '[]'
+      # The pull requests come from the label rather than from the step above,
+      # and that is not a tidying choice. release-please's prs output carries
+      # only what the run created or updated: when the release it computes has
+      # not changed, the action logs "remained the same", drops that pull
+      # request, and then sets no prs output at all rather than an empty array.
+      # A caller that batches releases — proposing on every push, merging on a
+      # daily schedule — lands on that case almost every day, because the last
+      # push already wrote the pull request the scheduled run then finds
+      # unchanged. Gating on prs there merges nothing, ever, and produces no
+      # failing run to say so. The label is what release-please puts on a
+      # release pull request regardless of which run last touched it.
+      #
+      # !inputs.dry-run is load-bearing now. It used to be backed up by prs
+      # being empty whenever the pull request was skipped; a label lookup finds
+      # the standing release pull request either way, so this condition is the
+      # only thing left keeping a dry run from merging a real release.
+      - name: Enable auto-merge on the open release pull requests
+        if: inputs.auto-merge && !inputs.dry-run && env.CLIENT_ID != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
           GH_REPO: ${{ github.repository }}
-          PRS: ${{ steps.release.outputs.prs }}
         run: |
-          jq -r '.[].number' <<< "${PRS}" | while read -r pr; do
+          prs="$(gh pr list --label 'autorelease: pending' --state open --limit 100 --json number --jq '.[].number')"
+          if [[ -z "${prs}" ]]; then
+            echo 'No open release pull request to enable auto-merge on.'
+            exit 0
+          fi
+          while read -r pr; do
             if gh pr merge --auto --squash "${pr}"; then
               echo "Auto-merge enabled on #${pr}."
             else
               echo "::warning::Could not enable auto-merge on #${pr}. Merge it by hand."
             fi
-          done
+          done <<< "${prs}"
