@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.0](https://github.com/kanso-labs/github-actions/compare/v3.1.2...v3.2.0) (2026-08-27)
+
+
+### Features
+
+* auto-merge release pull requests once a day ([#50](https://github.com/kanso-labs/github-actions/issues/50)) ([e517132](https://github.com/kanso-labs/github-actions/commit/e5171328b5d089b38b3c606b21ce81b426373949))
+
 ## [3.1.2](https://github.com/kanso-labs/github-actions/compare/v3.1.1...v3.1.2) (2026-08-26)
 
 
