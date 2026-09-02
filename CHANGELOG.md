@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.1](https://github.com/kanso-labs/github-actions/compare/v3.2.0...v3.2.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* **lint-workflows:** ignore actionlint's stale report of the code-quality scope ([#52](https://github.com/kanso-labs/github-actions/issues/52)) ([0e3a473](https://github.com/kanso-labs/github-actions/commit/0e3a4739c8dcda5f93855eb067fe769713a91a44))
+
 ## [3.2.0](https://github.com/kanso-labs/github-actions/compare/v3.1.2...v3.2.0) (2026-08-27)
 
 
