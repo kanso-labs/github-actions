@@ -34,19 +34,34 @@ discovers it on its own, which is why no input here exposes it:
 
 ```yaml
 paths:
-  .github/workflows/test.yaml:
+  .github/workflows/deploy.yaml:
     ignore:
-      - 'unknown permission scope "code-quality"'
+      - 'shellcheck reported issue in this script: SC2086'
 ```
 
 Scope the suppression to the file that needs it rather than passing a global
 `-ignore`, so the rule keeps running everywhere else.
 
-That example is the real one. actionlint carries its own copy of the valid
-permission scopes, so a scope GitHub has added since the pinned release —
-`code-quality`, which `actions/upload-code-coverage` requires — is reported as
-unknown until the bump lands. The workflow is correct and the linter is stale,
-which is the case this file is for.
+## The built-in ignore
+
+This action already passes one `-ignore` of its own, for
+`unknown permission scope "code-quality"`. Consumers do not need to suppress
+that themselves.
+
+actionlint carries its own copy of the valid permission scopes, and the pinned
+release predates `code-quality`, which `actions/upload-code-coverage` requires.
+A workflow granting it is correct and the linter is stale. That is a fact about
+the pin rather than about any one repository, so the correction lives here,
+beside the pin, instead of in a `.github/actionlint.yaml` in every consumer that
+uploads coverage.
+
+It matches the scope name exactly, so a misspelt scope — `code-qualty` — still
+fails.
+
+It retires with the pin. When `version` is bumped to a release whose permission
+table includes `code-quality`, the flag goes: check `rule_permissions.go` at
+that tag, or lint a workflow granting the scope with that release and watch it
+pass. Renovate puts that check in the body of the bump pull request.
 
 ## Where it runs
 

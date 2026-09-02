@@ -21,13 +21,31 @@ runs:
     # actionlint reads .github/workflows from the working directory, so there
     # has to be one already.
     #
-    # A repository silences a rule by committing .github/actionlint.yaml, which
-    # actionlint discovers on its own — so no input here exposes it. That file
-    # is also how a stale built-in list gets worked around: actionlint carries
-    # its own copy of the valid permission scopes, and a scope GitHub has added
-    # since the pinned release is reported as unknown until the bump lands.
+    # A repository silences a rule of its own by committing
+    # .github/actionlint.yaml, which actionlint discovers on its own — so no
+    # input here exposes it.
     - name: Run actionlint
       uses: raven-actions/actionlint@v2.2.0
       with:
         fail-on-error: true
+        # A correction to a stale table, not a policy choice. actionlint
+        # carries its own copy of the valid permission scopes, and the pinned
+        # release predates code-quality, which actions/upload-code-coverage
+        # requires — so it reports a correct workflow as wrong. That is not
+        # specific to any one repository, which is why the suppression lives
+        # beside the pin that causes it rather than in a .github/actionlint.yaml
+        # in each consumer. The scope name is matched exactly, so a misspelt
+        # one still fails.
+        #
+        # Writing the spaces as \s is load-bearing. The wrapper splits this
+        # input on whitespace with a regex that keeps whatever quotes it finds,
+        # so a quoted argument reaches actionlint still carrying its quotes and
+        # matches nothing. -ignore takes an RE2 regex, which is what makes \s
+        # available to spell the message without a space in it.
+        #
+        # Retire this when version is bumped to a release whose permission
+        # table includes code-quality: check rule_permissions.go at that tag,
+        # or lint a workflow granting the scope with that release and watch it
+        # pass.
+        flags: '-ignore unknown\spermission\sscope\s"code-quality"'
         version: ${{ inputs.version }}
