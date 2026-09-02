@@ -67,11 +67,14 @@ without stopping anything — so a workflow linter added that way reports proble
 to no one.
 
 A repository silences a rule by committing `.github/actionlint.yaml`, which
-actionlint discovers by itself. That file is also the escape hatch for
-actionlint being stale: it carries its own copy of the valid permission scopes,
-so a scope GitHub has added since the pinned release reads as an error on a
-workflow that is perfectly correct. A consumer uploading code coverage needs
-exactly that for `code-quality`, which `actions/upload-code-coverage` requires.
+actionlint discovers by itself.
+
+One stale-list case is already handled here and needs nothing from consumers.
+actionlint carries its own copy of the valid permission scopes, so a scope
+GitHub has added since the pinned release reads as an error on a workflow that
+is perfectly correct — `code-quality`, which `actions/upload-code-coverage`
+requires. The action passes an `-ignore` for exactly that message, and retires
+it when the pin moves.
 
 ## `_publish-npm.yaml`
 
