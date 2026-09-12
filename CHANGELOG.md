@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.0](https://github.com/kanso-labs/github-actions/compare/v3.2.2...v3.3.0) (2026-09-12)
+
+
+### Features
+
+* carry an updated dependency's release notes into the changelog ([#56](https://github.com/kanso-labs/github-actions/issues/56)) ([2b7ff31](https://github.com/kanso-labs/github-actions/commit/2b7ff314f37c8b681c7c26e876b01345ba6b673a))
+
 ## [3.2.2](https://github.com/kanso-labs/github-actions/compare/v3.2.1...v3.2.2) (2026-09-09)
 
 
