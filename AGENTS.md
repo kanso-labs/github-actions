@@ -22,11 +22,12 @@ every caller before changing an input's meaning or a default.
 
 ## Commands
 
-| Task           | Command          | Notes                                           |
-| -------------- | ---------------- | ----------------------------------------------- |
-| Lint           | `npm run lint`   | Prettier check over the YAML, JSON and Markdown |
-| Format         | `npm run format` | Prettier write; run it before pushing           |
-| Lint workflows | `actionlint`     | Also runs as a step of `Lint` in CI             |
+| Task           | Command          | Notes                                                 |
+| -------------- | ---------------- | ----------------------------------------------------- |
+| Lint           | `npm run lint`   | Prettier check over the YAML, JSON and Markdown       |
+| Format         | `npm run format` | Prettier write; run it before pushing                 |
+| Lint workflows | `actionlint`     | Also runs as a step of `Lint` in CI                   |
+| Test           | `npm test`       | `node --test` over `actions/**`; runs as `Test` in CI |
 
 There is no `SessionStart` hook here, so `npm ci` is yours to run before
 `npm run lint`. Neither command type-checks anything — see Verifying a change
@@ -144,7 +145,7 @@ CI resolves; if `node --version` disagrees, prefix the command:
 `mise exec node@24.19.0 -- npm ci`. An older npm rewrites the lockfile as it
 installs, dropping platform entries a Linux runner needs.
 
-**Both composite actions have a live smoke test**, in
+**Two of the three composite actions have a live smoke test**, in
 [`lint.yaml`](.github/workflows/lint.yaml): `check-formatting` calls
 `./actions/setup-node` and `lint-workflows` calls `./actions/lint-workflows`, so
 a change that breaks either fails on the pull request rather than in whichever
@@ -154,6 +155,21 @@ exercise them — keep them that way round, and do not "tidy" either into a plai
 
 A local `./` reference is safe there and is not safe inside a reusable workflow;
 see the trap below before copying the pattern into one.
+
+**`actions/upstream-changelog` has unit tests instead, and the difference is not
+a preference.** A live run of it needs an open Renovate pull request carrying
+release notes, which exists in a consumer and never here. `Run the unit tests`
+in [`test.yaml`](.github/workflows/test.yaml) covers the parsing and the
+rewriting against a body in Renovate's own layout, which is where every bug it
+has had so far lived.
+
+What no test here covers is release-please agreeing: that the block parses, that
+the lines land under the right package, and that the bump stays a patch. That
+needs release-please itself, and the recipe is in
+[the action's README](actions/upstream-changelog/README.md). Run it when you
+change what the block looks like, rather than trusting the unit tests, because
+they assert the shape this repository decided on and not the shape
+release-please accepts.
 
 **The reusable workflow has one too, in dry-run.** `Dry run release-please` in
 [`test.yaml`](.github/workflows/test.yaml) calls

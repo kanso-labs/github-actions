@@ -9,6 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  # actions/upstream-changelog is the only thing here with enough logic of its
+  # own to be worth unit testing, and the only one that cannot be smoke tested
+  # the way the other two composite actions are: a live run needs an open
+  # Renovate pull request carrying release notes, which exists in a consumer
+  # and not here. The tests stand in for that, over a body in Renovate's own
+  # layout.
+  #
+  # What they cannot cover is release-please agreeing with the block they
+  # check. That part is in the action's README, as a recipe to run by hand.
+  test:
+    name: Run the unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Node
+        uses: ./actions/setup-node
+
+      - name: Run the unit tests
+        run: npm test
+
   # _release-please.yaml is the one thing here that nothing exercised. The
   # composite action has a live smoke test in lint.yaml, but this workflow only
   # ever runs on a push to a default branch, so the two actions it pins —
