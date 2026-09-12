@@ -1,0 +1,83 @@
+name: Upstream Changelog
+description:
+  Rewrites a Renovate pull request body so that the release notes of the
+  dependency it updates reach the changelog release-please writes at merge time.
+
+inputs:
+  commit-type:
+    default: upstream
+    description:
+      Conventional commit type given to each upstream change. It has to appear
+      in the consuming repository's release-please changelog-sections, or the
+      lines are parsed and then hidden.
+    required: false
+  pull-request:
+    default: ${{ github.event.pull_request.number }}
+    description:
+      Number of the pull request to rewrite. The default only resolves on a
+      pull_request event.
+    required: false
+  title-type:
+    default: fix
+    description:
+      Only rewrite pull requests whose title carries this conventional commit
+      type. It is a filter over which dependencies this runs for, expressed
+      through what the consuming repository already tells Renovate to write.
+    required: false
+  token:
+    default: ${{ github.token }}
+    description:
+      Token used to read and edit the pull request. It needs pull-requests
+      write.
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # Every value the upstream project controls arrives through a file or an
+    # environment variable, never interpolated into the shell. A release body
+    # is arbitrary text written by someone with no relationship to this
+    # repository, and it reaches here quoted inside the pull request body.
+    - name: Rewrite the pull request body
+      shell: bash
+      env:
+        COMMIT_TYPE: ${{ inputs.commit-type }}
+        # Without this gh looks for a git remote, and a job calling this action
+        # has no reason to have checked anything out.
+        GH_REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ inputs.token }}
+        PR_NUMBER: ${{ inputs.pull-request }}
+        TITLE_TYPE: ${{ inputs.title-type }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "${PR_NUMBER}" ]]; then
+          echo '::error::No pull request number was given, and this event carries none.'
+          exit 1
+        fi
+
+        # Under RUNNER_TEMP rather than the workspace, which belongs to the
+        # caller and may hold a checkout something later in the job reads.
+        pr="${RUNNER_TEMP}/upstream-changelog"
+        mkdir -p "${pr}"
+
+        gh pr view "${PR_NUMBER}" --json body,title > "${pr}/pr.json"
+        jq --raw-output '.body' "${pr}/pr.json" > "${pr}/body.md"
+        PR_TITLE="$(jq --raw-output '.title' "${pr}/pr.json")"
+        export PR_TITLE
+
+        # The script prints nothing when it has nothing to change, and says why
+        # on stderr. That is the ordinary outcome for most pull requests in a
+        # repository — an upgrade of something that publishes no release notes,
+        # or one this is deliberately not running for — so it is a notice
+        # rather than a failure.
+        node "${GITHUB_ACTION_PATH}/upstream-changelog.mjs" \
+          < "${pr}/body.md" > "${pr}/rewritten.md"
+
+        if [[ ! -s "${pr}/rewritten.md" ]]; then
+          echo "::notice::Left #${PR_NUMBER} alone."
+          exit 0
+        fi
+
+        gh pr edit "${PR_NUMBER}" --body-file "${pr}/rewritten.md"
+        echo "::notice::Rewrote the body of #${PR_NUMBER} to carry its upstream release notes."

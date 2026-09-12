@@ -9,13 +9,14 @@ them to consume these. A private consumer would need
 
 ## What is here
 
-| Thing                                                                | Kind              | Solves                                                                     |
-| -------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------- |
-| [`actions/lint-workflows`](actions/lint-workflows)                   | Composite action  | Running actionlint, pinned, in every repository that has workflows         |
-| [`actions/setup-node`](actions/setup-node)                           | Composite action  | The Node setup preamble repeated in every Node CI job                      |
-| [`_publish-npm.yaml`](.github/workflows/_publish-npm.yaml)           | Reusable workflow | Publishing a package to npm and to GitHub Packages, after a release is cut |
-| [`_release-please.yaml`](.github/workflows/_release-please.yaml)     | Reusable workflow | Proposing releases, with a token whose pull requests run CI                |
-| [`_renovate-command.yaml`](.github/workflows/_renovate-command.yaml) | Reusable workflow | Answering `@renovate rebase` on a pull request, the way Dependabot does    |
+| Thing                                                                | Kind              | Solves                                                                        |
+| -------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------- |
+| [`actions/lint-workflows`](actions/lint-workflows)                   | Composite action  | Running actionlint, pinned, in every repository that has workflows            |
+| [`actions/setup-node`](actions/setup-node)                           | Composite action  | The Node setup preamble repeated in every Node CI job                         |
+| [`actions/upstream-changelog`](actions/upstream-changelog)           | Composite action  | Getting an updated dependency's own release notes into a consumer's changelog |
+| [`_publish-npm.yaml`](.github/workflows/_publish-npm.yaml)           | Reusable workflow | Publishing a package to npm and to GitHub Packages, after a release is cut    |
+| [`_release-please.yaml`](.github/workflows/_release-please.yaml)     | Reusable workflow | Proposing releases, with a token whose pull requests run CI                   |
+| [`_renovate-command.yaml`](.github/workflows/_renovate-command.yaml) | Reusable workflow | Answering `@renovate rebase` on a pull request, the way Dependabot does       |
 
 ## Consuming them
 
@@ -75,6 +76,24 @@ GitHub has added since the pinned release reads as an error on a workflow that
 is perfectly correct — `code-quality`, which `actions/upload-code-coverage`
 requires. The action passes an `-ignore` for exactly that message, and retires
 it when the pin moves.
+
+## `actions/upstream-changelog`
+
+Rewrites a Renovate pull request body so that the release notes of the
+dependency it updates reach the changelog release-please writes at merge time —
+turning a release that says `update dependency nzbgetcom/nzbget to v26.3` into
+one that lists what nzbget actually changed. Full inputs and the mechanism are
+in [its README](actions/upstream-changelog/README.md).
+
+It is worth having wherever the dependency _is_ the product: a repository
+packaging somebody else's application, where "what changed" means what changed
+upstream. In a library it is noise, because a changelog full of Storybook's
+release notes buries the library's own.
+
+Two things a consumer has to do beyond calling it: give the `commit-type` a
+section in `release-please-config.json`, and trigger on `edited` as well as
+`opened` and `synchronize`, so that a Renovate rewrite of the body is followed
+by a rewrite of ours.
 
 ## `_publish-npm.yaml`
 
